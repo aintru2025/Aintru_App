@@ -1,0 +1,10 @@
+ALEX JOHNSON
+Software Engineer
+alex.johnson@email.com
+
+EDUCATION
+Bachelor of Science in Computer Science
+Bits Pilani University, 2023
+
+SKILLS
+JavaScript, React, Node.js, Python

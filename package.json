@@ -1,0 +1,56 @@
+{
+  "name": "aintru-ai-interview-platform",
+  "version": "1.0.0",
+  "description": "AI-Powered Interview Platform with Mock Interviews, Resume Builder, and Analytics",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "clean": "rm -rf node_modules backend/node_modules frontend/node_modules",
+    "test": "echo \"Tests not configured yet\" && exit 0",
+    "lint": "cd frontend && npm run lint",
+    "setup": "npm run install:all && echo \"Setup complete! Run 'npm run dev' to start the application\"",
+    "health": "curl http://localhost:3000/health",
+    "postinstall": "echo \"Run 'npm run setup' to install all dependencies\""
+  },
+  "keywords": [
+    "ai",
+    "interview",
+    "mock-interview",
+    "resume-builder",
+    "career",
+    "job-preparation",
+    "react",
+    "nodejs",
+    "mongodb",
+    "openai",
+    "deepgram"
+  ],
+  "author": "Aintru Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/aintru.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/aintru/issues"
+  },
+  "homepage": "https://github.com/yourusername/aintru#readme",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ]
+}

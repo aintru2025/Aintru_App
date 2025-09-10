@@ -1,0 +1,52 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Aintru AI-Powered Interview Platform Backend",
+  "main": "start.js",
+  "scripts": {
+    "start": "node start.js",
+    "dev": "nodemon index.js",
+    "prod": "NODE_ENV=production node start.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "health": "curl http://localhost:3000/health",
+    "lint": "echo \"No linter configured\"",
+    "build": "echo \"No build step required\""
+  },
+  "keywords": [
+    "interview",
+    "ai",
+    "mock-interview",
+    "career"
+  ],
+  "author": "Aintru Team",
+  "license": "ISC",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.57.0",
+    "@deepgram/sdk": "^3.13.0",
+    "@elevenlabs/elevenlabs-js": "^2.7.0",
+    "@mediapipe/tasks-vision": "^0.10.22-rc.20250304",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.0.1",
+    "elevenlabs": "^1.59.0",
+    "express": "^5.1.0",
+    "express-fileupload": "^1.5.2",
+    "express-session": "^1.18.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.16.4",
+    "nodemailer": "^7.0.5",
+    "openai": "^5.11.0",
+    "passport": "^0.7.0",
+    "passport-github2": "^0.1.12",
+    "passport-google-oauth20": "^2.0.0",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
