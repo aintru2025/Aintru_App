@@ -1,22 +1,14 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
+const {
+  getProgress,
+  getImprovement,
+  getPerformance,
+} = require("../controllers/analytics.controller");
 
-// GET /api/analytics/progress - Get user progress analytics
-router.get('/progress', async (req, res) => {
-  // TODO: Fetch progress analytics from database
-  res.json({ progress: {} });
-});
+// Define analytics routes
+router.get("/progress", getProgress);
+router.get("/improvement", getImprovement);
+router.get("/performance", getPerformance);
 
-// GET /api/analytics/improvement - Get user improvement analytics
-router.get('/improvement', async (req, res) => {
-  // TODO: Fetch improvement analytics from database
-  res.json({ improvement: {} });
-});
-
-// GET /api/analytics/performance - Get user performance analytics
-router.get('/performance', async (req, res) => {
-  // TODO: Fetch performance analytics from database
-  res.json({ performance: {} });
-});
-
-module.exports = router; 
+module.exports = router;
