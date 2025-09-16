@@ -11,6 +11,8 @@ const analyticsRoutes = require('./routes/analytics');
 const suggestionsRoutes = require('./routes/suggestions');
 const dashboardRoutes = require('./routes/dashboard');
 const waitlistRoutes = require('./routes/waitlist');
+const examRoutes = require("./routes/examRoutes");
+
 const mongoose = require('mongoose');
 
 // Import Passport configuration
@@ -92,6 +94,8 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/suggestions', suggestionsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/waitlist', waitlistRoutes);
+
+app.use("/api/exam", examRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
