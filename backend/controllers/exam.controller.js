@@ -1,4 +1,4 @@
-const examService = require("../services/examService");
+const examService = require("../services/exam.service");
 
 
 async function startExamInterview(req, res) {
@@ -56,8 +56,33 @@ async function generateExamSummary(req, res) {
   }
 }
 
+async function addVideoFrame(req, res) {
+  try {
+    const { sessionId } = req.params;
+    const frameData = req.body;
+
+    if (!frameData) {
+      return res.status(400).json({ error: "Frame data is required" });
+    }
+
+    const session = await examService.addVideoAnalysisFrame(
+      sessionId,
+      frameData
+    );
+
+    return res.status(200).json({
+      message: "Frame added",
+      sessionId: session._id,
+    });
+  } catch (err) {
+    console.error("❌ Error adding video frame:", err.message);
+    return res.status(500).json({ error: "Failed to add video frame" });
+  }
+}
+
 module.exports = {
   startExamInterview,
   completeExamInterview,
   generateExamSummary,
+  addVideoFrame,
 };

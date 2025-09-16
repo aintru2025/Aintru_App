@@ -98,8 +98,27 @@ async function generateSummary(sessionId) {
   return session;
 }
 
+/**
+ * video/emotion analysis data for a session
+ * @param {string} sessionId
+ * @param {Object} frameData - { faceDetected, numFaces, emotions }
+ */
+async function addVideoAnalysisFrame(sessionId, frameData) {
+  const session = await ExamInterview.findById(sessionId);
+  if (!session) throw new Error("Session not found");
+
+  session.videoAnalysis.push({
+    timestamp: new Date(),
+    ...frameData,
+  });
+
+  await session.save();
+  return session;
+}
+
 module.exports = {
   startExamInterview,
   evaluateExam,
   generateSummary,
+  addVideoAnalysisFrame,
 };
