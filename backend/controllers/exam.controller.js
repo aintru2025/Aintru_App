@@ -1,10 +1,9 @@
 const examService = require("../services/exam.service");
 
-
 async function startExamInterview(req, res) {
   try {
     const { examType } = req.body;
-    const userId = req.userId; 
+    const userId = req.userId;
 
     if (!examType) {
       return res.status(400).json({ error: "Exam type is required" });
@@ -22,7 +21,6 @@ async function startExamInterview(req, res) {
   }
 }
 
-
 async function completeExamInterview(req, res) {
   try {
     const { sessionId } = req.params;
@@ -38,7 +36,6 @@ async function completeExamInterview(req, res) {
     return res.status(500).json({ error: "Failed to evaluate exam" });
   }
 }
-
 
 async function generateExamSummary(req, res) {
   try {
@@ -80,9 +77,31 @@ async function addVideoFrame(req, res) {
   }
 }
 
+async function getVideoMetrics(req, res) {
+  try {
+    const { sessionId } = req.params;
+
+    const session = await examService.getSessionById(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    const metrics = examService.computeVideoMetrics(session);
+
+    return res.status(200).json({
+      message: "Video metrics computed",
+      metrics,
+    });
+  } catch (err) {
+    console.error("❌ Error computing video metrics:", err.message);
+    return res.status(500).json({ error: "Failed to compute video metrics" });
+  }
+}
+
 module.exports = {
   startExamInterview,
   completeExamInterview,
   generateExamSummary,
   addVideoFrame,
+  getVideoMetrics,
 };
