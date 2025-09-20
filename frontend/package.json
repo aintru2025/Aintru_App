@@ -26,6 +26,7 @@
     "@react-three/fiber": "^8.15.19",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
+    "face-api.js": "^0.22.2",
     "framer-motion": "^12.23.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",

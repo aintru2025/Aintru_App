@@ -1,11 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { Mic, MicOff, Video, VideoOff, Send, Code, MessageCircle, Clock, Eye, Brain } from 'lucide-react';
-import Editor from '@monaco-editor/react';
+import React, { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
+import {
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  Send,
+  Code,
+  MessageCircle,
+  Clock,
+  Eye,
+  Brain,
+} from "lucide-react";
+import Editor from "@monaco-editor/react";
+import * as faceapi from "face-api.js";
 
 interface InterviewExecutionProps {
   setupData: any;
-  mode: 'voice' | 'video';
+  mode: "voice" | "video" | "exam"; // ✅ added exam mode
   onInterviewComplete: (results: any) => void;
 }
 
@@ -27,79 +39,192 @@ interface InterviewState {
   totalDuration: number;
 }
 
-const InterviewExecution: React.FC<InterviewExecutionProps> = ({ 
-  setupData, 
-  mode, 
-  onInterviewComplete 
+interface ExamSession {
+  _id: string;
+  examType: string;
+  questions: { question: string; userAnswer?: string }[];
+  currentIndex: number;
+  isCompleted: boolean;
+  summary?: string;
+}
+
+const InterviewExecution: React.FC<InterviewExecutionProps> = ({
+  setupData,
+  mode,
+  onInterviewComplete,
 }) => {
   const [state, setState] = useState<InterviewState>({
     currentRound: 1,
-    currentQuestion: '',
+    currentQuestion: "",
     isListening: false,
     isRecording: false,
-    transcript: '',
+    transcript: "",
     confidence: 0,
     mediaPipeData: {
       eyeContact: 0,
       stress: 0,
       posture: 0,
-      distraction: 0
+      distraction: 0,
     },
-    codeOutput: '',
+    codeOutput: "",
     roundScores: [],
-    totalDuration: 0
+    totalDuration: 0,
   });
+
+  // ✅ Exam interview state
+  const [examSession, setExamSession] = useState<ExamSession | null>(null);
+  const [answer, setAnswer] = useState("");
+  const [summary, setSummary] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const startTimeRef = useRef<number>(Date.now());
 
   const interviewFlow = setupData.interviewFlow;
-  const currentRoundConfig = interviewFlow?.rounds?.find((r: any) => r.round === state.currentRound);
+  const currentRoundConfig = interviewFlow?.rounds?.find(
+    (r: any) => r.round === state.currentRound
+  );
 
+  // Shared timer for both modes
   useEffect(() => {
-    startInterview();
     const timer = setInterval(() => {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
-        totalDuration: Math.floor((Date.now() - startTimeRef.current) / 1000)
+        totalDuration: Math.floor((Date.now() - startTimeRef.current) / 1000),
       }));
     }, 1000);
 
     return () => clearInterval(timer);
   }, []);
 
+  // ---------------------------
+  // ✅ Exam Interview Flow
+  // ---------------------------
+  useEffect(() => {
+    if (mode !== "exam") return;
+    const initExam = async () => {
+      try {
+        const res = await fetch("/api/exam/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ examType: setupData.examType }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setExamSession(data.session);
+        }
+      } catch (err) {
+        console.error("❌ Error starting exam:", err);
+        setError("Failed to start exam");
+      }
+    };
+    initExam();
+  }, [mode, setupData.examType]);
+
+  // Load face-api for exam mode
+  useEffect(() => {
+    if (mode !== "exam") return;
+    const loadModelsAndStartVideo = async () => {
+      await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
+      await faceapi.nets.faceExpressionNet.loadFromUri("/models");
+      if (videoRef.current) {
+        navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+          videoRef.current!.srcObject = stream;
+        });
+      }
+    };
+    loadModelsAndStartVideo();
+  }, [mode]);
+
+  // Periodically send video frames
+  useEffect(() => {
+    if (mode !== "exam" || !examSession?._id) return;
+    const interval = setInterval(async () => {
+      if (!videoRef.current) return;
+      const detections = await faceapi
+        .detectAllFaces(
+          videoRef.current,
+          new faceapi.TinyFaceDetectorOptions()
+        )
+        .withFaceExpressions();
+      const frameData = {
+        faceDetected: detections.length > 0,
+        numFaces: detections.length,
+        emotions: detections[0]?.expressions || {},
+      };
+      await fetch(`/api/exam/${examSession._id}/frame`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(frameData),
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [mode, examSession]);
+
+  const handleNextExamQuestion = () => {
+    if (!examSession) return;
+    const updated = { ...examSession };
+    updated.questions[updated.currentIndex].userAnswer = answer;
+    updated.currentIndex += 1;
+    setAnswer("");
+    setExamSession(updated);
+  };
+
+  const handleFinishExam = async () => {
+    if (!examSession) return;
+    try {
+      await fetch(`/api/exam/${examSession._id}/complete`, { method: "POST" });
+      const res = await fetch(`/api/exam/${examSession._id}/summary`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSummary(data.session.summary);
+        setExamSession({ ...examSession, isCompleted: true });
+      }
+    } catch (err) {
+      console.error("❌ Error finishing exam:", err);
+    }
+  };
+
+  // ---------------------------
+  // Job Interview Flow (unchanged)
+  // ---------------------------
+  useEffect(() => {
+    if (mode === "exam") return;
+    startInterview();
+  }, []);
+
   const startInterview = async () => {
     setIsLoading(true);
     try {
-      // Generate first question using GPT-4o
-      const response = await fetch('http://localhost:3000/api/interview/generate-question', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          company: setupData.company,
-          role: setupData.role,
-          round: state.currentRound,
-          roundType: currentRoundConfig?.type,
-          candidateProfile: setupData.candidateProfile
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:3000/api/interview/generate-question",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company: setupData.company,
+            role: setupData.role,
+            round: state.currentRound,
+            roundType: currentRoundConfig?.type,
+            candidateProfile: setupData.candidateProfile,
+          }),
+        }
+      );
 
       if (response.ok) {
-      const data = await response.json();
-        setState(prev => ({
+        const data = await response.json();
+        setState((prev) => ({
           ...prev,
-          currentQuestion: data.question
+          currentQuestion: data.question,
         }));
       }
     } catch (error) {
-      console.error('Error starting interview:', error);
-      setError('Failed to start interview');
+      console.error("Error starting interview:", error);
+      setError("Failed to start interview");
     } finally {
       setIsLoading(false);
     }
@@ -108,19 +233,19 @@ const InterviewExecution: React.FC<InterviewExecutionProps> = ({
   const toggleRecording = async () => {
     if (state.isRecording) {
       stopRecording();
-      } else {
+    } else {
       startRecording();
     }
   };
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: true, 
-        video: mode === 'video' 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: mode === "video",
       });
 
-      if (mode === 'video' && videoRef.current) {
+      if (mode === "video" && videoRef.current) {
         videoRef.current.srcObject = stream;
       }
 
@@ -134,144 +259,145 @@ const InterviewExecution: React.FC<InterviewExecutionProps> = ({
       };
 
       mediaRecorder.start();
-      setState(prev => ({ ...prev, isRecording: true, isListening: true }));
+      setState((prev) => ({ ...prev, isRecording: true, isListening: true }));
 
-      // Start MediaPipe analysis if video mode
-      if (mode === 'video') {
+      if (mode === "video") {
         startMediaPipeAnalysis();
       }
     } catch (error) {
-      console.error('Error starting recording:', error);
-      setError('Failed to start recording');
+      console.error("Error starting recording:", error);
+      setError("Failed to start recording");
     }
   };
 
   const stopRecording = () => {
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      mediaRecorderRef.current.stream
+        .getTracks()
+        .forEach((track) => track.stop());
     }
-    setState(prev => ({ ...prev, isRecording: false, isListening: false }));
+    setState((prev) => ({ ...prev, isRecording: false, isListening: false }));
   };
 
   const processAudioData = async (audioBlob: Blob) => {
     try {
       const formData = new FormData();
-      formData.append('audio', audioBlob);
+      formData.append("audio", audioBlob);
 
-      const response = await fetch('http://localhost:3000/api/interview/transcribe', {
-        method: 'POST',
-        body: formData,
-      });
+      const response = await fetch(
+        "http://localhost:3000/api/interview/transcribe",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
-          transcript: data.transcript
+          transcript: data.transcript,
         }));
 
-        // Generate AI response based on transcript
         await generateAIResponse(data.transcript);
       }
     } catch (error) {
-      console.error('Error processing audio:', error);
+      console.error("Error processing audio:", error);
     }
   };
 
   const generateAIResponse = async (transcript: string) => {
     try {
-      const response = await fetch('http://localhost:3000/api/interview/ai-response', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          transcript,
-          currentQuestion: state.currentQuestion,
-          round: state.currentRound,
-          roundType: currentRoundConfig?.type,
-          company: setupData.company,
-          role: setupData.role
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:3000/api/interview/ai-response",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            transcript,
+            currentQuestion: state.currentQuestion,
+            round: state.currentRound,
+            roundType: currentRoundConfig?.type,
+            company: setupData.company,
+            role: setupData.role,
+          }),
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
-        
         if (data.nextQuestion) {
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
-            currentQuestion: data.nextQuestion
+            currentQuestion: data.nextQuestion,
           }));
         } else if (data.roundComplete) {
           await completeRound(data.score);
         }
       }
     } catch (error) {
-      console.error('Error generating AI response:', error);
+      console.error("Error generating AI response:", error);
     }
   };
 
   const completeRound = async (score: number) => {
     const newRoundScores = [...state.roundScores, score];
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
-      roundScores: newRoundScores
+      roundScores: newRoundScores,
     }));
 
     if (state.currentRound < interviewFlow.rounds.length) {
-      // Move to next round
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         currentRound: prev.currentRound + 1,
-        transcript: ''
+        transcript: "",
       }));
       await startInterview();
     } else {
-      // Interview complete
       await completeInterview(newRoundScores);
     }
   };
 
   const completeInterview = async (finalScores: number[]) => {
     try {
-      const response = await fetch('http://localhost:3000/api/interview/complete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          setupData,
-          scores: finalScores,
-          duration: state.totalDuration,
-          mediaPipeData: state.mediaPipeData,
-          transcript: state.transcript
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:3000/api/interview/complete",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            setupData,
+            scores: finalScores,
+            duration: state.totalDuration,
+            mediaPipeData: state.mediaPipeData,
+            transcript: state.transcript,
+          }),
+        }
+      );
 
       if (response.ok) {
         const results = await response.json();
         onInterviewComplete(results);
       }
     } catch (error) {
-      console.error('Error completing interview:', error);
+      console.error("Error completing interview:", error);
     }
   };
 
   const startMediaPipeAnalysis = () => {
-    // Simulate MediaPipe analysis for now
     const interval = setInterval(() => {
       if (state.isRecording) {
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           mediaPipeData: {
             eyeContact: Math.random() * 10,
             stress: Math.random() * 10,
             posture: Math.random() * 10,
-            distraction: Math.random() * 10
+            distraction: Math.random() * 10,
           },
-          confidence: Math.random() * 10
+          confidence: Math.random() * 10,
         }));
       } else {
         clearInterval(interval);
@@ -282,9 +408,65 @@ const InterviewExecution: React.FC<InterviewExecutionProps> = ({
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  // ---------------------------
+  // Render Logic
+  // ---------------------------
+  if (mode === "exam") {
+    if (!examSession) return <p>Loading exam...</p>;
+    if (examSession.isCompleted)
+      return (
+        <div className="p-6 bg-gray-900 text-white">
+          <h2 className="text-2xl font-bold mb-4">Exam Completed ✅</h2>
+          <p>{summary || "Generating summary..."}</p>
+        </div>
+      );
+
+    const currentQ = examSession.questions[examSession.currentIndex];
+    return (
+      <div className="p-6 bg-gray-900 text-white">
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          width="320"
+          height="240"
+          className="rounded-lg mb-4"
+        />
+        <h2 className="text-xl font-bold mb-2">
+          Question {examSession.currentIndex + 1}
+        </h2>
+        <p className="mb-2">{currentQ?.question}</p>
+        <textarea
+          value={answer}
+          onChange={(e) => setAnswer(e.target.value)}
+          className="w-full border rounded p-2 mb-4 text-black"
+          placeholder="Type your answer..."
+        />
+        {examSession.currentIndex < examSession.questions.length - 1 ? (
+          <button
+            onClick={handleNextExamQuestion}
+            className="px-4 py-2 bg-blue-600 text-white rounded"
+          >
+            Next
+          </button>
+        ) : (
+          <button
+            onClick={handleFinishExam}
+            className="px-4 py-2 bg-green-600 text-white rounded"
+          >
+            Finish
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // ---------------------------
+  // Default Job Interview UI
+  // ---------------------------
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <div className="container mx-auto px-4 py-8">
@@ -293,51 +475,68 @@ const InterviewExecution: React.FC<InterviewExecutionProps> = ({
           <div>
             <h1 className="text-2xl font-bold">
               {setupData.company} - {setupData.role}
-          </h1>
+            </h1>
             <p className="text-gray-400">
               Round {state.currentRound} of {interviewFlow?.rounds?.length || 1}
-          </p>
-        </div>
+            </p>
+          </div>
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Clock className="w-5 h-5" />
               <span>{formatTime(state.totalDuration)}</span>
-                </div>
+            </div>
             <div className="flex items-center space-x-2">
               <Brain className="w-5 h-5" />
               <span>{state.confidence.toFixed(1)}/10</span>
-                </div>
-                </div>
-              </div>
+            </div>
+          </div>
+        </div>
 
+        {/* Job Interview Layout (unchanged) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column - Video/Audio */}
+          {/* Left Column */}
           <div className="space-y-6">
-            {/* Video/Audio Display */}
             <div className="bg-gray-800 rounded-lg p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">
-                  {mode === 'video' ? 'Video Interview' : 'Voice Interview'}
+                  {mode === "video" ? "Video Interview" : "Voice Interview"}
                 </h2>
                 <div className="flex space-x-2">
-                  {mode === 'video' && (
-                <button
-                      onClick={() => setState(prev => ({ ...prev, isRecording: !prev.isRecording }))}
-                      className={`p-2 rounded ${state.isRecording ? 'bg-red-500' : 'bg-gray-600'}`}
+                  {mode === "video" && (
+                    <button
+                      onClick={() =>
+                        setState((prev) => ({
+                          ...prev,
+                          isRecording: !prev.isRecording,
+                        }))
+                      }
+                      className={`p-2 rounded ${
+                        state.isRecording ? "bg-red-500" : "bg-gray-600"
+                      }`}
                     >
-                      {state.isRecording ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                      {state.isRecording ? (
+                        <VideoOff className="w-5 h-5" />
+                      ) : (
+                        <Video className="w-5 h-5" />
+                      )}
                     </button>
                   )}
-                <button
+                  <button
                     onClick={toggleRecording}
-                    className={`p-2 rounded ${state.isRecording ? 'bg-red-500' : 'bg-blue-500'}`}
-                >
-                    {state.isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                </button>
+                    className={`p-2 rounded ${
+                      state.isRecording ? "bg-red-500" : "bg-blue-500"
+                    }`}
+                  >
+                    {state.isRecording ? (
+                      <MicOff className="w-5 h-5" />
+                    ) : (
+                      <Mic className="w-5 h-5" />
+                    )}
+                  </button>
                 </div>
               </div>
 
-              {mode === 'video' && (
+              {mode === "video" && (
                 <video
                   ref={videoRef}
                   autoPlay
@@ -346,20 +545,21 @@ const InterviewExecution: React.FC<InterviewExecutionProps> = ({
                 />
               )}
 
-              {mode === 'voice' && (
+              {mode === "voice" && (
                 <div className="h-64 bg-gray-700 rounded flex items-center justify-center">
                   <div className="text-center">
                     <Mic className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                     <p className="text-gray-400">
-                      {state.isRecording ? 'Recording...' : 'Click to start recording'}
+                      {state.isRecording
+                        ? "Recording..."
+                        : "Click to start recording"}
                     </p>
-              </div>
-            </div>
+                  </div>
+                </div>
               )}
-          </div>
+            </div>
 
-            {/* MediaPipe Analysis */}
-            {mode === 'video' && (
+            {mode === "video" && (
               <div className="bg-gray-800 rounded-lg p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center">
                   <Eye className="w-5 h-5 mr-2" />
@@ -368,28 +568,35 @@ const InterviewExecution: React.FC<InterviewExecutionProps> = ({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className="text-sm text-gray-400">Eye Contact</span>
-                    <div className="text-lg font-semibold">{state.mediaPipeData.eyeContact.toFixed(1)}/10</div>
+                    <div className="text-lg font-semibold">
+                      {state.mediaPipeData.eyeContact.toFixed(1)}/10
+                    </div>
                   </div>
                   <div>
                     <span className="text-sm text-gray-400">Stress Level</span>
-                    <div className="text-lg font-semibold">{state.mediaPipeData.stress.toFixed(1)}/10</div>
+                    <div className="text-lg font-semibold">
+                      {state.mediaPipeData.stress.toFixed(1)}/10
+                    </div>
                   </div>
                   <div>
                     <span className="text-sm text-gray-400">Posture</span>
-                    <div className="text-lg font-semibold">{state.mediaPipeData.posture.toFixed(1)}/10</div>
-                </div>
+                    <div className="text-lg font-semibold">
+                      {state.mediaPipeData.posture.toFixed(1)}/10
+                    </div>
+                  </div>
                   <div>
                     <span className="text-sm text-gray-400">Focus</span>
-                    <div className="text-lg font-semibold">{(10 - state.mediaPipeData.distraction).toFixed(1)}/10</div>
+                    <div className="text-lg font-semibold">
+                      {(10 - state.mediaPipeData.distraction).toFixed(1)}/10
+                    </div>
                   </div>
                 </div>
               </div>
             )}
-                    </div>
+          </div>
 
-          {/* Right Column - Question & Code */}
+          {/* Right Column */}
           <div className="space-y-6">
-            {/* Current Question */}
             <div className="bg-gray-800 rounded-lg p-6">
               <h3 className="text-lg font-semibold mb-4 flex items-center">
                 <MessageCircle className="w-5 h-5 mr-2" />
@@ -403,11 +610,10 @@ const InterviewExecution: React.FC<InterviewExecutionProps> = ({
                 ) : (
                   <p className="text-gray-200">{state.currentQuestion}</p>
                 )}
-                    </div>
-                    </div>
+              </div>
+            </div>
 
-            {/* Code Editor for Technical Rounds */}
-            {currentRoundConfig?.questionType === 'coding' && (
+            {currentRoundConfig?.questionType === "coding" && (
               <div className="bg-gray-800 rounded-lg p-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center">
                   <Code className="w-5 h-5 mr-2" />
@@ -419,18 +625,22 @@ const InterviewExecution: React.FC<InterviewExecutionProps> = ({
                     defaultLanguage="javascript"
                     theme="vs-dark"
                     value={state.codeOutput}
-                    onChange={(value) => setState(prev => ({ ...prev, codeOutput: value || '' }))}
+                    onChange={(value) =>
+                      setState((prev) => ({
+                        ...prev,
+                        codeOutput: value || "",
+                      }))
+                    }
                     options={{
                       minimap: { enabled: false },
                       fontSize: 14,
-                      wordWrap: 'on'
+                      wordWrap: "on",
                     }}
                   />
                 </div>
               </div>
             )}
 
-            {/* Transcript */}
             <div className="bg-gray-800 rounded-lg p-6">
               <h3 className="text-lg font-semibold mb-4">Your Response</h3>
               <div className="bg-gray-700 rounded p-4 min-h-32">
@@ -438,15 +648,16 @@ const InterviewExecution: React.FC<InterviewExecutionProps> = ({
                   <p className="text-gray-200">{state.transcript}</p>
                 ) : (
                   <p className="text-gray-400 italic">
-                    {state.isRecording ? 'Listening...' : 'Your response will appear here'}
+                    {state.isRecording
+                      ? "Listening..."
+                      : "Your response will appear here"}
                   </p>
                 )}
-                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Error Display */}
         {error && (
           <div className="fixed bottom-4 right-4 bg-red-500 text-white p-4 rounded-lg">
             {error}
@@ -457,4 +668,4 @@ const InterviewExecution: React.FC<InterviewExecutionProps> = ({
   );
 };
 
-export default InterviewExecution; 
+export default InterviewExecution;

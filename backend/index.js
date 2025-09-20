@@ -12,6 +12,7 @@ const suggestionsRoutes = require('./routes/suggestions');
 const dashboardRoutes = require('./routes/dashboard');
 const waitlistRoutes = require('./routes/waitlist');
 const examRoutes = require("./routes/examRoutes");
+const jobRoutes = require("./routes/job");
 
 const mongoose = require('mongoose');
 
@@ -96,6 +97,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 
 app.use("/api/exam", examRoutes);
+app.use("/api/job", jobRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

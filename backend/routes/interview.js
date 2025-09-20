@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const interviewController = require("../controllers/interviewController");
+const interviewController = require("../controllers/interview.controller");
 
 // AI-powered interview routes
 router.post("/generate-question", interviewController.generateQuestion);

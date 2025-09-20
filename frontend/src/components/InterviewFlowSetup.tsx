@@ -89,86 +89,59 @@ const InterviewFlowSetup: React.FC<InterviewFlowSetupProps> = ({ onSetupComplete
     setStep(7); // Go to interview flow generation
   };
 
-  const generateInterviewFlow = async () => {
-    setLoading(true);
-    setError(null);
+const generateInterviewFlow = async () => {
+  setLoading(true);
+  setError(null);
 
-    try {
-      const token = getToken();
-      const endpoint = setupData.preparationType === 'exam' 
-        ? 'http://localhost:3000/api/interviewFlow/generate-exam-flow'
-        : 'http://localhost:3000/api/interviewFlow/generate-interview-flow';
+  try {
+    const token = getToken();
+    const endpoint = setupData.preparationType === 'exam'
+      ? 'http://localhost:3000/api/interviewFlow/generate-exam-flow'
+      : 'http://localhost:3000/api/interviewFlow/generate-interview-flow';
 
-      const requestBody = setupData.preparationType === 'exam' 
-        ? {
-            examName: setupData.examName,
-            examDescription: setupData.examDescription
-          }
-        : {
-            company: setupData.company,
-            role: setupData.role,
-            experience: setupData.experienceLevel,
-            expectedCTC: setupData.expectedCTC,
-            candidateProfileId: setupData.candidateProfile?._id
-          };
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setSetupData(prev => ({ ...prev, interviewFlow: data.interviewFlow }));
-        if (setupData.preparationType === 'exam') {
-          setStep(4); // Show exam flow preview
-        } else {
-          setStep(8); // Show job flow preview
+    const requestBody = setupData.preparationType === 'exam'
+      ? {
+          examName: setupData.examName,
+          examDescription: setupData.examDescription,
+          userId: getToken() // Or get it from auth store if needed
         }
-      } else if (data.fallback) {
-        // Use fallback data if provided
-        setSetupData(prev => ({ 
-          ...prev, 
-          interviewFlow: {
-            company: setupData.company,
-            role: setupData.role,
-            experienceLevel: setupData.experienceLevel,
-            rounds: data.fallback.rounds,
-            totalDuration: data.fallback.rounds.reduce((total, round) => {
-              const durationStr = round.duration || "30 mins";
-              const minutesMatch = durationStr.match(/(\d+)/);
-              const duration = minutesMatch ? parseInt(minutesMatch[1]) : 30;
-              return total + duration;
-            }, 0)
-          }
-        }));
-        if (setupData.preparationType === 'exam') {
-          setStep(4);
-        } else {
-          setStep(8);
-        }
+      : {
+          company: setupData.company,
+          role: setupData.role,
+          experience: setupData.experienceLevel,
+          expectedCTC: setupData.expectedCTC,
+          candidateProfileId: setupData.candidateProfile?._id
+        };
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.success) {
+      setSetupData(prev => ({ ...prev, interviewFlow: data.interviewFlow }));
+      if (setupData.preparationType === 'exam') {
+        setStep(4); // Show exam flow preview
       } else {
-        // Handle specific exam not found error
-        if (data.error === 'Exam not found' && setupData.preparationType === 'exam') {
-          setError(`Exam not found: ${data.message}`);
-          // Go back to exam details step to let user correct the exam name
-          setStep(2);
-        } else {
-          throw new Error(data.error || 'Failed to generate interview flow');
-        }
+        setStep(8); // Show job flow preview
       }
-    } catch (error) {
-      console.error('❌ Error generating interview flow:', error);
-      setError(error instanceof Error ? error.message : 'Failed to generate interview flow. Please try again.');
-    } finally {
-      setLoading(false);
+    } else {
+      throw new Error(data.error || 'Failed to generate interview flow');
     }
-  };
+  } catch (error) {
+    console.error('❌ Error generating interview flow:', error);
+    setError(error instanceof Error ? error.message : 'Failed to generate interview flow. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleAcceptFlow = () => {
     onSetupComplete(setupData);
@@ -523,19 +496,21 @@ const ExamFlowPreview: React.FC<{ flow: any; onAccept: () => void }> = ({ flow, 
     <div className="space-y-6">
       <div className="text-center">
         <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-6" />
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Step 3: Interview Flow Preview</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Step 3: Exam Interview Flow Preview</h2>
         <p className="text-gray-600 mb-6">
-          Here's your personalized interview flow for the exam preparation.
+          Here's your personalized interview flow for the exam "{flow?.examName}".
         </p>
       </div>
-      
+
       <div className="bg-white rounded-2xl p-6 shadow-sm">
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">Interview Process</h3>
+        <h3 className="text-xl font-semibold text-gray-900 mb-4">Interview Rounds</h3>
         <div className="space-y-4">
           {flow?.rounds?.map((round: any, index: number) => (
             <div key={index} className="border-l-4 border-purple-500 pl-4">
               <h4 className="font-medium text-gray-900">{round.name}</h4>
-              <p className="text-gray-600 text-sm">{round.description}</p>
+              <p className="text-gray-600 text-sm">
+                Questions: {round.questions?.length || 0}
+              </p>
               <p className="text-purple-600 text-sm font-medium">{round.duration}</p>
             </div>
           ))}
@@ -551,11 +526,12 @@ const ExamFlowPreview: React.FC<{ flow: any; onAccept: () => void }> = ({ flow, 
         onClick={onAccept}
         className="w-full bg-green-500 text-white py-3 px-6 rounded-lg hover:bg-green-600 transition-colors font-medium"
       >
-        Accept & Start Interview
+        Accept & Start Exam
       </button>
     </div>
   );
 };
+
 
 // Job Flow Preview Component
 const JobFlowPreview: React.FC<{ flow: any; onAccept: () => void }> = ({ flow, onAccept }) => {
