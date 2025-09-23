@@ -43,6 +43,59 @@ async function startExamInterview(userId, examType) {
   return session;
 }
 
+
+async function submitAnswer(sessionId, answer) {
+  const session = await ExamInterview.findById(sessionId);
+  if (!session) throw new Error("Session not found");
+
+  const idx = session.currentIndex;
+  if (idx >= session.questions.length) {
+    throw new Error("All questions already answered");
+  }
+
+  session.questions[idx].userAnswer = answer;
+
+  // (Optional) lightweight correctness check here with Gemini per question
+  // For now, just mark null → final evaluation will handle it
+  session.questions[idx].isCorrect = null;
+
+  // Move to next question
+  session.currentIndex = idx + 1;
+
+  await session.save();
+  return session;
+}
+
+
+/**
+ * Submit all answers at once
+ */
+async function submitAllAnswers(sessionId, answers) {
+  const session = await ExamInterview.findById(sessionId);
+  if (!session) throw new Error("Session not found");
+  if (session.isCompleted) throw new Error("Exam already completed");
+
+  if (!Array.isArray(answers) || answers.length === 0) {
+    throw new Error("Answers must be a non-empty array");
+  }
+
+  if (answers.length !== session.questions.length) {
+    throw new Error(
+      `Expected ${session.questions.length} answers, got ${answers.length}`
+    );
+  }
+
+  session.questions.forEach((q, idx) => {
+    q.userAnswer = answers[idx] || "Not answered";
+  });
+
+  session.currentIndex = session.questions.length;
+  session.isCompleted = true;
+
+  await session.save();
+  return session;
+}
+
 /**
  * Compute aggregated metrics from raw video frames
  */
@@ -184,6 +237,8 @@ async function generateSummary(sessionId) {
 
 module.exports = {
   startExamInterview,
+  submitAnswer,
+  submitAllAnswers,
   evaluateExam,
   generateSummary,
   addVideoAnalysisFrame,

@@ -21,6 +21,49 @@ async function startExamInterview(req, res) {
   }
 }
 
+async function submitExamAnswer(req, res) {
+  try {
+    const { sessionId } = req.params;
+    const { answer } = req.body;
+
+    if (!answer) {
+      return res.status(400).json({ error: "Answer is required" });
+    }
+
+    const session = await examService.submitAnswer(sessionId, answer);
+
+    return res.status(200).json({
+      message: "Answer submitted",
+      session,
+    });
+  } catch (err) {
+    console.error("❌ Error submitting answer:", err.message);
+    return res.status(500).json({ error: "Failed to submit answer" });
+  }
+}
+
+async function submitAllExamAnswers(req, res) {
+  try {
+    const { sessionId } = req.params;
+    const { answers } = req.body;
+
+    if (!answers) {
+      return res.status(400).json({ error: "Answers are required" });
+    }
+
+    const session = await examService.submitAllAnswers(sessionId, answers);
+
+    return res.status(200).json({
+      message: "All answers submitted",
+      isCompleted: session.isCompleted,
+    });
+  } catch (err) {
+    console.error("❌ Error submitting all answers:", err.message);
+    return res.status(500).json({ error: "Failed to submit all answers" });
+  }
+}
+
+
 async function completeExamInterview(req, res) {
   try {
     const { sessionId } = req.params;
@@ -100,6 +143,8 @@ async function getVideoMetrics(req, res) {
 
 module.exports = {
   startExamInterview,
+  submitExamAnswer,
+  submitAllExamAnswers,
   completeExamInterview,
   generateExamSummary,
   addVideoFrame,
