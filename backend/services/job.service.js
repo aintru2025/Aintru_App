@@ -2,7 +2,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const JobInterview = require("../models/JobInterview");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 /**
  * Ask Gemini to generate a job interview flow (rounds + round-wise questions)
@@ -128,6 +128,50 @@ async function startJobInterview(userId, company = "Target Company", role = "Sof
     rounds,
     totalRounds: rounds.length,
     totalDuration,
+  });
+
+  await session.save();
+  return session;
+}
+
+/**
+ * Submit a single answer for a given question in a round
+ */
+async function submitAnswer(sessionId, roundIndex, questionIndex, answer) {
+  const session = await JobInterview.findById(sessionId);
+  if (!session) throw new Error("Session not found");
+
+  if (!session.rounds[roundIndex]) throw new Error("Invalid round index");
+  if (!session.rounds[roundIndex].questions[questionIndex])
+    throw new Error("Invalid question index");
+
+  // save user answer
+  session.rounds[roundIndex].questions[questionIndex].userAnswer = answer;
+  await session.save();
+
+  return session;
+}
+
+/**
+ * Submit all answers at once
+ * Expects answers in the format:
+ * [
+ *   { roundIndex: 0, questionIndex: 0, answer: "..." },
+ *   { roundIndex: 0, questionIndex: 1, answer: "..." },
+ *   ...
+ * ]
+ */
+async function submitAllAnswers(sessionId, answers) {
+  const session = await JobInterview.findById(sessionId);
+  if (!session) throw new Error("Session not found");
+
+  answers.forEach(({ roundIndex, questionIndex, answer }) => {
+    if (
+      session.rounds[roundIndex] &&
+      session.rounds[roundIndex].questions[questionIndex]
+    ) {
+      session.rounds[roundIndex].questions[questionIndex].userAnswer = answer;
+    }
   });
 
   await session.save();
@@ -331,6 +375,8 @@ async function getSessionById(sessionId) {
 module.exports = {
   generateInterviewFlow,
   startJobInterview,
+  submitAnswer,
+  submitAllAnswers,
   addVideoAnalysisFrame,
   computeVideoMetrics,
   evaluateJobInterview,

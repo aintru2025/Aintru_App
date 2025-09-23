@@ -37,6 +37,44 @@ async function startJobInterview(req, res) {
   }
 }
 
+const submitAnswer = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { roundIndex, questionIndex, answer } = req.body;
+
+    const session = await jobInterviewService.submitAnswer(
+      sessionId,
+      roundIndex,
+      questionIndex,
+      answer
+    );
+
+    res.json({ message: "Answer submitted", session });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error submitting answer", error: error.message });
+  }
+};
+
+const submitAllAnswers = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { answers } = req.body;
+
+    const session = await jobInterviewService.submitAllAnswers(
+      sessionId,
+      answers
+    );
+
+    res.json({ message: "All answers submitted", session });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error submitting all answers", error: error.message });
+  }
+};
+
 async function addVideoFrame(req, res) {
   try {
     const { sessionId } = req.params;
@@ -100,6 +138,8 @@ async function getVideoMetrics(req, res) {
 module.exports = {
   generateInterviewFlow,
   startJobInterview,
+  submitAnswer,
+  submitAllAnswers,
   addVideoFrame,
   evaluateInterview,
   generateSummary,

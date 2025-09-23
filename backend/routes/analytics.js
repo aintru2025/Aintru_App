@@ -6,6 +6,11 @@ const {
   getPerformance,
 } = require("../controllers/analytics.controller");
 
+const { validateSession } = require("../middlewares/auth.middleware");
+
+
+router.use(validateSession);
+
 // Define analytics routes
 router.get("/progress", getProgress);
 router.get("/improvement", getImprovement);

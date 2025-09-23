@@ -16,6 +16,9 @@ router.post(
   jobController.startJobInterview
 );
 
+router.post("/:sessionId/answer", validateSession, jobController.submitAnswer);
+router.post("/:sessionId/submit", validateSession, jobController.submitAllAnswers);
+
 // POST /api/interview/:sessionId/frame (no auth required)
 router.post("/interview/:sessionId/frame", jobController.addVideoFrame);
 
