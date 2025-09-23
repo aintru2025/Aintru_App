@@ -1,16 +1,17 @@
 const express = require("express");
 const router = express.Router();
 const examController = require("../controllers/exam.controller");
+const { validateSession } = require("../middlewares/auth.middleware");
 
 
-router.post("/start", examController.startExamInterview);
+router.post("/start", validateSession, examController.startExamInterview);
 
 
-router.post("/:sessionId/complete", examController.completeExamInterview);
+router.post("/:sessionId/complete", validateSession, examController.completeExamInterview);
 
 
-router.post("/:sessionId/summary", examController.generateExamSummary);
+router.post("/:sessionId/summary", validateSession, examController.generateExamSummary);
 
-router.post("/:sessionId/video-frame", examController.addVideoFrame);
+router.post("/:sessionId/video-frame", validateSession, examController.addVideoFrame);
 
 module.exports = router;
