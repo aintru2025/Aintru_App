@@ -7,9 +7,10 @@ import {
   Mic, Video, Upload, User, ArrowRight, Clock, CheckCircle, 
   Building, Briefcase, GraduationCap, Camera, MicIcon, 
   Play, Pause, RotateCcw, Send, AlertCircle, Trophy,
-  FileText, BarChart, TrendingUp, Award, MessageCircle
+  FileText, BarChart, TrendingUp, Award, MessageCircle,
+  MicOff
 } from 'lucide-react';
-import type { ExamSession, VideoFrameData } from '../types/exam';
+import type { ExamSession, VideoFrameData } from '../stores/exam';
 
 interface SetupData {
   preparationType: 'exam' | 'job';
@@ -58,11 +59,100 @@ const MockInterview = () => {
   const [mode, setMode] = useState<'voice' | 'video' | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [currentAnswer, setCurrentAnswer] = useState('');
+  const [cursorPosition, setCursorPosition] = useState(0);
+
+  // Voice recognition state
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
   
   // Video/Audio refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const videoFrameIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      setSpeechSupported(true);
+      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onresult = (event: any) => {
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          }
+        }
+
+        // Update the current answer with speech input
+        if (finalTranscript) {
+          setCurrentAnswer(prev => prev + finalTranscript);
+          // Keep focus on textarea
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+          }
+        }
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+  }, []);
+
+  // Voice control functions
+  const startListening = () => {
+    if (recognitionRef.current && speechSupported && !isListening) {
+      setIsListening(true);
+      recognitionRef.current.start();
+    }
+  };
+
+  const stopListening = () => {
+    if (recognitionRef.current && isListening) {
+      setIsListening(false);
+      recognitionRef.current.stop();
+    }
+  };
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const textarea = e.target;
+  const value = textarea.value;
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  
+  // Store cursor position before state update
+  setCursorPosition(start);
+  setCurrentAnswer(value);
+  
+  // Restore cursor position after React re-render
+  requestAnimationFrame(() => {
+    if (textareaRef.current) {
+      textareaRef.current.setSelectionRange(start, end);
+    }
+  });
+};
+
+
+  // Maintain focus on textarea
+  const maintainTextareaFocus = () => {
+  if (textareaRef.current && document.activeElement !== textareaRef.current) {
+    textareaRef.current.focus();
+  }
+};
 
   // Auth check
   useEffect(() => {
@@ -81,6 +171,9 @@ const MockInterview = () => {
       }
       if (videoFrameIntervalRef.current) {
         clearInterval(videoFrameIntervalRef.current);
+      }
+      if (recognitionRef.current && isListening) {
+        recognitionRef.current.stop();
       }
     };
   }, []);
@@ -448,6 +541,9 @@ const MockInterview = () => {
         if (currentQuestionIndex < currentExam.totalQuestions - 1) {
           goToNextQuestion();
         }
+        
+        // Maintain focus on textarea after state update
+        maintainTextareaFocus();
       }
     };
 
@@ -589,15 +685,42 @@ const MockInterview = () => {
                   </div>
 
                   <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Your Answer
-                    </label>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Your Answer
+                      </label>
+                      {speechSupported && (
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={isListening ? stopListening : startListening}
+                            className={`p-2 rounded-lg transition-colors ${
+                              isListening
+                                ? 'bg-red-500 text-white hover:bg-red-600'
+                                : 'bg-blue-500 text-white hover:bg-blue-600'
+                            }`}
+                            title={isListening ? 'Stop Voice Input' : 'Start Voice Input'}
+                          >
+                            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                          </button>
+                          <span className="text-sm text-gray-500">
+                            {isListening ? 'Listening...' : 'Voice Input'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                     <textarea
+                      ref={textareaRef}
                       value={currentAnswer}
-                      onChange={(e) => setCurrentAnswer(e.target.value)}
-                      placeholder="Type your answer here..."
+                      onChange={handleTextareaChange}
+                      onFocus={maintainTextareaFocus}
+                      placeholder="Type your answer here or use voice input..."
                       className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    autoFocus
+                     
                     />
+                    {isListening && (
+                      <p className="text-sm text-blue-600 mt-2">🎤 Listening... Speak clearly into your microphone</p>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between">
