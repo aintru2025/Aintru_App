@@ -2,9 +2,26 @@
 export interface Question {
   question: string;
   userAnswer?: string;
+  score?: number | null;
+  feedback?: string;
   isCorrect?: boolean | null;
   answeredAt?: Date;
   timeTakenSec?: number;
+  _id?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Round {
+  round: number;
+  name: string;
+  type: string;
+  duration: number;
+  description: string;
+  questions: Question[];
+  _id?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface VideoAnalysis {
@@ -40,7 +57,13 @@ export interface BehavioralMetrics {
 export interface ExamSession {
   _id: string;
   userId: string;
-  examType: string;
+  examType?: string;
+  company?: string;
+  role?: string;
+  candidateProfileId?: string | null;
+  rounds?: Round[];
+  totalRounds?: number;
+  totalDuration?: number;
   questions: Question[];
   currentIndex: number;
   totalQuestions: number;
@@ -54,6 +77,23 @@ export interface ExamSession {
   __v: number;
 }
 
+export interface InterviewSession {
+  userId: string;
+  company: string;
+  role: string;
+  candidateProfileId?: string | null;
+  rounds: Round[];
+  totalRounds: number;
+  totalDuration: number;
+  isCompleted: boolean;
+  summary: string;
+  _id: string;
+  videoAnalysis: VideoAnalysis[];
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
+
 export interface StartExamRequest {
   examType: string;
 }
@@ -61,6 +101,17 @@ export interface StartExamRequest {
 export interface StartExamResponse {
   message: string;
   session: ExamSession;
+}
+
+export interface StartInterviewRequest {
+  company: string;
+  role: string;
+  experience: string;
+}
+
+export interface StartInterviewResponse {
+  success: boolean;
+  session: InterviewSession;
 }
 
 export interface SubmitAnswersRequest {
@@ -109,10 +160,13 @@ export interface VideoMetricsResponse {
 
 export interface ExamStoreState {
   currentExam: ExamSession | null;
+  currentInterview: InterviewSession | null;
   examSessions: ExamSession[];
+  interviewSessions: InterviewSession[];
   loading: boolean;
   error: string | null;
   currentQuestionIndex: number;
+  currentRoundIndex: number;
   userAnswers: string[];
   timeRemaining: number | null;
   isSubmitting: boolean;
@@ -120,19 +174,35 @@ export interface ExamStoreState {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearError: () => void;
+  
+  // Existing exam methods
   startExam: (examType: string, authToken: string) => Promise<ExamSession>;
   setCurrentQuestion: (index: number) => void;
   updateAnswer: (questionIndex: number, answer: string) => void;
   submitAnswers: (sessionId: string, authToken: string) => Promise<SubmitAnswersResponse>;
   completeExam: (sessionId: string, authToken: string) => Promise<ExamSession>;
   generateSummary: (sessionId: string, authToken: string) => Promise<ExamSession>;
+  
+  // New interview methods
+  startInterview: (company: string, role: string, experience: string, authToken?: string) => Promise<InterviewSession>;
+  setCurrentRound: (roundIndex: number) => void;
+  getCurrentRound: () => Round | null;
+  submitRoundAnswers: (sessionId: string, roundIndex: number, answers: string[], authToken?: string) => Promise<any>;
+  completeInterview: (sessionId: string, authToken?: string) => Promise<InterviewSession>;
+  
+  // Video and metrics methods
   addVideoFrame: (sessionId: string, frameData: VideoFrameData) => Promise<AddVideoFrameResponse | void>;
   getVideoMetrics: (sessionId: string) => Promise<BehavioralMetrics>;
+  
+  // Timer and navigation methods
   updateTimer: () => void;
   setTimeRemaining: (time: number) => void;
   goToNextQuestion: () => void;
   goToPreviousQuestion: () => void;
   resetExam: () => void;
+  resetInterview: () => void;
+  
+  // Utility methods
   getCurrentQuestion: () => Question | null;
   getProgress: () => number;
   getAnsweredCount: () => number;
