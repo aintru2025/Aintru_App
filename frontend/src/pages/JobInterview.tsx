@@ -7,7 +7,7 @@ import {
   Mic, Video, ArrowRight, Clock, CheckCircle, 
   Camera, MicIcon, RotateCcw, AlertCircle, Trophy,
   FileText, BarChart, TrendingUp, Award, MessageCircle,
-  MicOff, Briefcase, Building, User, Save
+  MicOff, Briefcase, Building, User, Save, Loader2
 } from 'lucide-react';
 import type { VideoFrameData, Round, InterviewSession } from '../stores/exam';
 
@@ -32,7 +32,8 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
     updateInterviewAnswer,
     submitSingleAnswer,
     submitMultipleAnswers,
-    completeInterview,
+    evaluateInterview,
+    generateInterviewSummary,
     addVideoFrame,
     getProgress,
     getAnsweredCount,
@@ -51,7 +52,7 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
   } = useExamStore();
 
   // Component State
-  const [step, setStep] = useState<'setup' | 'mode-selection' | 'interview' | 'complete'>('setup');
+  const [step, setStep] = useState<'setup' | 'mode-selection' | 'interview' | 'evaluation' | 'complete'>('setup');
   const [localJobDetails, setLocalJobDetails] = useState({
     company: '',
     role: '',
@@ -71,6 +72,8 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
   const [isStartingInterview, setIsStartingInterview] = useState(false);
   const [isSavingAnswer, setIsSavingAnswer] = useState(false);
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
   // Video/Audio refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -508,7 +511,7 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
     const currentQuestion = getCurrentQuestion();
     const progress = getProgress();
     
-    // NEW: Real API answer submission function
+    // Real API answer submission function
     const handleAnswerSubmit = async (isNextQuestion = true) => {
       if (!currentAnswer.trim() || !currentInterview) return;
 
@@ -545,17 +548,17 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
       }
     };
 
-    // NEW: Save answer without moving to next question
+    // Save answer without moving to next question
     const handleSaveAnswer = () => {
       handleAnswerSubmit(false);
     };
 
-    // NEW: Submit answer and move to next question
+    // Submit answer and move to next question
     const handleNextQuestion = () => {
       handleAnswerSubmit(true);
     };
 
-    // Updated complete round function
+    // Complete round function - now moves to evaluation
     const handleCompleteRound = async () => {
       if (!currentInterview || !currentRound) return;
       
@@ -573,8 +576,7 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
           setCurrentRound(currentRoundIndex + 1);
           setCurrentAnswer('');
         } else {
-          // Complete the entire interview
-          await completeInterview(currentInterview._id, token);
+          // Complete all rounds - now move to evaluation phase
           
           // Stop media streams
           if (mediaStreamRef.current) {
@@ -586,7 +588,7 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
             videoFrameIntervalRef.current = null;
           }
           
-          setStep('complete');
+          setStep('evaluation');
         }
       } catch (error: any) {
         console.error('Failed to complete round:', error);
@@ -868,6 +870,122 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
     );
   };
 
+  // NEW: Evaluation Phase Component
+  const EvaluationPhase = () => {
+    const handleEvaluateAndComplete = async () => {
+      if (!currentInterview) return;
+
+      setIsEvaluating(true);
+      clearError();
+
+      try {
+        const token = getToken();
+        
+        // Step 1: Evaluate interview
+        console.log('Starting interview evaluation...');
+        await evaluateInterview(currentInterview._id, token);
+        
+        // Step 2: Generate summary
+        console.log('Generating interview summary...');
+        setIsGeneratingSummary(true);
+        await generateInterviewSummary(currentInterview._id, token);
+        
+        // Move to complete phase
+        setStep('complete');
+      } catch (error: any) {
+        console.error('Failed to evaluate/summarize interview:', error);
+        setError(error.message || 'Failed to process interview results. Please try again.');
+      } finally {
+        setIsEvaluating(false);
+        setIsGeneratingSummary(false);
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl p-8 shadow-sm text-center"
+          >
+            <div className="mb-6">
+              {isEvaluating && !isGeneratingSummary ? (
+                <>
+                  <BarChart className="w-16 h-16 text-blue-500 mx-auto mb-4 animate-pulse" />
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Evaluating Your Performance</h2>
+                  <p className="text-gray-600">Our AI is analyzing your answers and responses...</p>
+                </>
+              ) : isGeneratingSummary ? (
+                <>
+                  <MessageCircle className="w-16 h-16 text-green-500 mx-auto mb-4 animate-pulse" />
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Generating Summary</h2>
+                  <p className="text-gray-600">Creating personalized feedback and recommendations...</p>
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="w-16 h-16 text-purple-500 mx-auto mb-4" />
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Interview Analysis Ready</h2>
+                  <p className="text-gray-600 mb-6">
+                    Your interview has been completed successfully. Click below to get detailed analysis and feedback.
+                  </p>
+                  <button
+                    onClick={handleEvaluateAndComplete}
+                    className="w-full bg-blue-500 text-white py-3 px-6 rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center space-x-2"
+                  >
+                    <BarChart className="w-5 h-5" />
+                    <span>Get My Results</span>
+                  </button>
+                </>
+              )}
+            </div>
+
+            {(isEvaluating || isGeneratingSummary) && (
+              <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>
+                  {isEvaluating && !isGeneratingSummary ? 'Analyzing responses...' : 'Generating summary...'}
+                </span>
+              </div>
+            )}
+
+            {error && (
+              <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
+                  <p className="text-red-700 text-sm">{error}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    clearError();
+                    handleEvaluateAndComplete();
+                  }}
+                  className="mt-2 w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors text-sm"
+                >
+                  Retry Analysis
+                </button>
+              </div>
+            )}
+
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  resetInterview();
+                  setStep('setup');
+                  setMode(null);
+                  clearError();
+                }}
+                className="text-gray-500 hover:text-gray-700 text-sm"
+              >
+                Start New Interview Instead
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    );
+  };
+
   // Complete Phase
   const CompletePhase = () => {
     const handleDownloadReport = () => {
@@ -1002,16 +1120,6 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
             </div>
           )}
 
-          {/* Error Display */}
-          {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
-                <p className="text-red-700">{error}</p>
-              </div>
-            </div>
-          )}
-
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
@@ -1085,6 +1193,8 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
         return <ModeSelection />;
       case 'interview':
         return <InterviewPhase />;
+      case 'evaluation':
+        return <EvaluationPhase />;
       case 'complete':
         return <CompletePhase />;
       default:

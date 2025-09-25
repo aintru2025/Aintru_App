@@ -1,4 +1,5 @@
-// exam.ts - Updated interfaces
+// exam.ts - Updated interfaces with new evaluation and summary methods
+
 export interface Question {
   question: string;
   userAnswer?: string;
@@ -149,6 +150,20 @@ export interface MultipleAnswersResponse {
   session: InterviewSession;
 }
 
+// NEW: Interview evaluation interfaces
+export interface EvaluateInterviewResponse {
+  success: boolean;
+  message: string;
+  session: InterviewSession;
+}
+
+// NEW: Interview summary interfaces
+export interface GenerateInterviewSummaryResponse {
+  success: boolean;
+  message: string;
+  session: InterviewSession;
+}
+
 export interface CompleteExamResponse {
   message: string;
   session: ExamSession;
@@ -184,6 +199,7 @@ export interface VideoMetricsResponse {
   metrics: BehavioralMetrics;
 }
 
+// UPDATED: Extended interface for the store state with new methods
 export interface ExamStoreState {
   currentExam: ExamSession | null;
   currentInterview: InterviewSession | null;
@@ -216,7 +232,11 @@ export interface ExamStoreState {
   submitRoundAnswers: (sessionId: string, roundIndex: number, answers: string[], authToken?: string) => Promise<any>;
   completeInterview: (sessionId: string, authToken?: string) => Promise<InterviewSession>;
   
-  // New interview answer submission methods
+  // NEW: Interview evaluation and summary methods
+  evaluateInterview: (sessionId: string, authToken?: string) => Promise<InterviewSession>;
+  generateInterviewSummary: (sessionId: string, authToken?: string) => Promise<InterviewSession>;
+  
+  // Interview answer submission methods
   submitSingleAnswer: (sessionId: string, roundIndex: number, questionIndex: number, answer: string, authToken?: string) => Promise<SingleAnswerResponse>;
   submitMultipleAnswers: (sessionId: string, answers: Array<{ roundIndex: number; questionIndex: number; answer: string }>, authToken?: string) => Promise<MultipleAnswersResponse>;
   updateInterviewAnswer: (roundIndex: number, questionIndex: number, answer: string) => void;

@@ -1,4 +1,4 @@
-// ExamStore.ts
+// ExamStore.ts - Updated with new interview evaluation and summary methods
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import type { 
@@ -23,7 +23,27 @@ import type {
 
 const API_BASE_URL = 'http://localhost:3000/api';
 
-const useExamStore = create<ExamStoreState>()(
+// New interfaces for the evaluation and summary endpoints
+interface EvaluateInterviewResponse {
+  success: boolean;
+  message: string;
+  session: InterviewSession;
+}
+
+interface GenerateInterviewSummaryResponse {
+  success: boolean;
+  message: string;
+  session: InterviewSession;
+}
+
+// Extended interface for the store state
+interface ExtendedExamStoreState extends ExamStoreState {
+  // New methods for interview evaluation and summary
+  evaluateInterview: (sessionId: string, authToken?: string) => Promise<InterviewSession>;
+  generateInterviewSummary: (sessionId: string, authToken?: string) => Promise<InterviewSession>;
+}
+
+const useExamStore = create<ExtendedExamStoreState>()(
   devtools(
     (set, get) => ({
       currentExam: null,
@@ -116,6 +136,90 @@ const useExamStore = create<ExamStoreState>()(
             currentQuestionIndex: 0,
             userAnswers: new Array(totalQuestions).fill(''),
             timeRemaining: data.session.totalDuration * 60,
+            loading: false
+          });
+
+          return data.session;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          set({ error: errorMessage, loading: false });
+          throw error;
+        }
+      },
+
+      // NEW: Evaluate interview method
+      evaluateInterview: async (sessionId: string, authToken?: string): Promise<InterviewSession> => {
+        set({ loading: true, error: null });
+
+        try {
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+          };
+          
+          if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+          }
+
+          const response = await fetch(`${API_BASE_URL}/job/interview/${sessionId}/evaluate`, {
+            method: 'POST',
+            headers
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to evaluate interview');
+          }
+
+          const data: EvaluateInterviewResponse = await response.json();
+          
+          if (!data.success) {
+            throw new Error(data.message || 'Interview evaluation failed');
+          }
+
+          // Update the current interview session with evaluated data
+          set({
+            currentInterview: data.session,
+            loading: false
+          });
+
+          return data.session;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          set({ error: errorMessage, loading: false });
+          throw error;
+        }
+      },
+
+      // NEW: Generate interview summary method
+      generateInterviewSummary: async (sessionId: string, authToken?: string): Promise<InterviewSession> => {
+        set({ loading: true, error: null });
+
+        try {
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+          };
+          
+          if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+          }
+
+          const response = await fetch(`${API_BASE_URL}/job/interview/${sessionId}/summary`, {
+            method: 'POST',
+            headers
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to generate interview summary');
+          }
+
+          const data: GenerateInterviewSummaryResponse = await response.json();
+          
+          if (!data.success) {
+            throw new Error(data.message || 'Interview summary generation failed');
+          }
+
+          // Update the current interview session with summary
+          set({
+            currentInterview: { ...get().currentInterview!, summary: data.session.summary },
             loading: false
           });
 
@@ -415,7 +519,7 @@ const useExamStore = create<ExamStoreState>()(
 
       addVideoFrame: async (sessionId: string, frameData: VideoFrameData): Promise<AddVideoFrameResponse | void> => {
         try {
-          const response = await fetch(`${API_BASE_URL}/exam/${sessionId}/video-frame`, {
+          const response = await fetch(`${API_BASE_URL}/job/interview/${sessionId}/video-frame`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
