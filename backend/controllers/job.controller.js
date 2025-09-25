@@ -42,7 +42,7 @@ const submitAnswer = async (req, res) => {
     const { sessionId } = req.params;
     const { roundIndex, questionIndex, answer } = req.body;
 
-    const session = await jobInterviewService.submitAnswer(
+    const session = await jobService.submitAnswer(
       sessionId,
       roundIndex,
       questionIndex,
@@ -62,7 +62,7 @@ const submitAllAnswers = async (req, res) => {
     const { sessionId } = req.params;
     const { answers } = req.body;
 
-    const session = await jobInterviewService.submitAllAnswers(
+    const session = await jobService.submitAllAnswers(
       sessionId,
       answers
     );
