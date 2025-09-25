@@ -7,7 +7,7 @@ import {
   Mic, Video, ArrowRight, Clock, CheckCircle, 
   Camera, MicIcon, RotateCcw, AlertCircle, Trophy,
   FileText, BarChart, TrendingUp, Award, MessageCircle,
-  MicOff, Briefcase, Building, User
+  MicOff, Briefcase, Building, User, Save
 } from 'lucide-react';
 import type { VideoFrameData, Round, InterviewSession } from '../stores/exam';
 
@@ -29,8 +29,9 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
     getCurrentQuestion,
     setCurrentRound,
     setCurrentQuestion,
-    updateAnswer,
-    submitRoundAnswers,
+    updateInterviewAnswer,
+    submitSingleAnswer,
+    submitMultipleAnswers,
     completeInterview,
     addVideoFrame,
     getProgress,
@@ -45,10 +46,11 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
     goToPreviousQuestion,
     resetInterview,
     setError,
-    clearError
+    clearError,
+    isSubmitting
   } = useExamStore();
 
-  // Component State - Using separate local state for form inputs
+  // Component State
   const [step, setStep] = useState<'setup' | 'mode-selection' | 'interview' | 'complete'>('setup');
   const [localJobDetails, setLocalJobDetails] = useState({
     company: '',
@@ -68,6 +70,7 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
   const [speechSupported, setSpeechSupported] = useState(false);
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
   const [isStartingInterview, setIsStartingInterview] = useState(false);
+  const [isSavingAnswer, setIsSavingAnswer] = useState(false);
 
   // Video/Audio refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -241,9 +244,10 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
         });
       }
     };
-const handleBlur = (field: string, value: string) => {
-  setLocalJobDetails(prev => ({ ...prev, [field]: value }));
-};
+
+    const handleBlur = (field: string, value: string) => {
+      setLocalJobDetails(prev => ({ ...prev, [field]: value }));
+    };
 
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -270,8 +274,8 @@ const handleBlur = (field: string, value: string) => {
               </label>
               <input
                 type="text"
-               defaultValue={localJobDetails.company}   // ab defaultValue use karo
-    onBlur={(e) => handleBlur('company', e.target.value)} 
+                defaultValue={localJobDetails.company}
+                onBlur={(e) => handleBlur('company', e.target.value)} 
                 placeholder="e.g., Google, Microsoft, Startup"
                 className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                   formErrors.company ? 'border-red-500' : 'border-gray-300'
@@ -288,8 +292,8 @@ const handleBlur = (field: string, value: string) => {
               </label>
               <input
                 type="text"
-                 defaultValue={jobDetails.role}
-  onBlur={(e) => handleBlur('role', e.target.value)}
+                defaultValue={localJobDetails.role}
+                onBlur={(e) => handleBlur('role', e.target.value)}
                 placeholder="e.g., Software Engineer, Product Manager"
                 className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                   formErrors.role ? 'border-red-500' : 'border-gray-300'
@@ -305,8 +309,8 @@ const handleBlur = (field: string, value: string) => {
                 Experience Level
               </label>
               <select
-                defaultValue={jobDetails.experience} 
-    onBlur={(e) => handleBlur('experience', e.target.value)}
+                defaultValue={localJobDetails.experience} 
+                onBlur={(e) => handleBlur('experience', e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
                 <option value="Fresher">Fresher</option>
@@ -504,31 +508,54 @@ const handleBlur = (field: string, value: string) => {
     const currentQuestion = getCurrentQuestion();
     const progress = getProgress();
     
-    const handleAnswerSubmit = () => {
-      if (currentAnswer.trim() && currentInterview && currentRound) {
-        try {
-          // Calculate the global question index
-          const roundStartIndex = currentInterview.rounds
-            .slice(0, currentRoundIndex)
-            .reduce((acc, round) => acc + round.questions.length, 0);
-          const globalQuestionIndex = roundStartIndex + currentQuestionIndex;
-          
-          updateAnswer(globalQuestionIndex, currentAnswer.trim());
-          setCurrentAnswer('');
-          
-          // Auto move to next question
-          if (currentQuestionIndex < currentRound.questions.length - 1) {
-            goToNextQuestion();
-          }
-          
-          maintainTextareaFocus();
-        } catch (error) {
-          console.error('Failed to save answer:', error);
-          setError('Failed to save answer. Please try again.');
+    // NEW: Real API answer submission function
+    const handleAnswerSubmit = async (isNextQuestion = true) => {
+      if (!currentAnswer.trim() || !currentInterview) return;
+
+      setIsSavingAnswer(true);
+      try {
+        const token = getToken();
+        
+        // Submit single answer to real API
+        const response = await submitSingleAnswer(
+          currentInterview._id, 
+          currentRoundIndex, 
+          currentQuestionIndex, 
+          currentAnswer.trim(), 
+          token
+        );
+
+        console.log('Answer submitted successfully:', response);
+        
+        // Update local state
+        updateInterviewAnswer(currentRoundIndex, currentQuestionIndex, currentAnswer.trim());
+        setCurrentAnswer('');
+        
+        // Auto move to next question if requested
+        if (isNextQuestion && currentRound && currentQuestionIndex < currentRound.questions.length - 1) {
+          goToNextQuestion();
         }
+        
+        maintainTextareaFocus();
+      } catch (error: any) {
+        console.error('Failed to submit answer:', error);
+        setError(error.message || 'Failed to submit answer. Please try again.');
+      } finally {
+        setIsSavingAnswer(false);
       }
     };
 
+    // NEW: Save answer without moving to next question
+    const handleSaveAnswer = () => {
+      handleAnswerSubmit(false);
+    };
+
+    // NEW: Submit answer and move to next question
+    const handleNextQuestion = () => {
+      handleAnswerSubmit(true);
+    };
+
+    // Updated complete round function
     const handleCompleteRound = async () => {
       if (!currentInterview || !currentRound) return;
       
@@ -538,21 +565,8 @@ const handleBlur = (field: string, value: string) => {
         
         // Save current answer if there is one
         if (currentAnswer.trim()) {
-          const roundStartIndex = currentInterview.rounds
-            .slice(0, currentRoundIndex)
-            .reduce((acc, round) => acc + round.questions.length, 0);
-          const globalQuestionIndex = roundStartIndex + currentQuestionIndex;
-          updateAnswer(globalQuestionIndex, currentAnswer.trim());
+          await handleSaveAnswer();
         }
-
-        // Get answers for current round
-        const roundStartIndex = currentInterview.rounds
-          .slice(0, currentRoundIndex)
-          .reduce((acc, round) => acc + round.questions.length, 0);
-        const roundAnswers = userAnswers.slice(roundStartIndex, roundStartIndex + currentRound.questions.length);
-
-        // Submit round answers
-        await submitRoundAnswers(currentInterview._id, currentRoundIndex, roundAnswers, token);
 
         // Move to next round or complete interview
         if (currentRoundIndex < currentInterview.rounds.length - 1) {
@@ -669,6 +683,12 @@ const handleBlur = (field: string, value: string) => {
                 <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">
                   Progress: {Math.round(progress)}%
                 </div>
+                {(isSavingAnswer || isSubmitting) && (
+                  <div className="flex items-center space-x-2 text-sm text-blue-600">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                    <span>Saving...</span>
+                  </div>
+                )}
               </div>
             </div>
 

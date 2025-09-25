@@ -78,7 +78,7 @@ const useExamStore = create<ExamStoreState>()(
         }
       },
 
-      // New interview methods
+      // Updated interview methods with correct API endpoints
       startInterview: async (company: string, role: string, experience: string, authToken?: string): Promise<InterviewSession> => {
         set({ loading: true, error: null });
         
@@ -127,6 +127,84 @@ const useExamStore = create<ExamStoreState>()(
         }
       },
 
+      // New method for submitting individual answers (based on your API)
+      submitSingleAnswer: async (sessionId: string, roundIndex: number, questionIndex: number, answer: string, authToken?: string): Promise<any> => {
+        set({ isSubmitting: true, error: null });
+
+        try {
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+          };
+          
+          if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+          }
+
+          const response = await fetch(`${API_BASE_URL}/job/${sessionId}/answer`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ roundIndex, questionIndex, answer })
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to submit answer');
+          }
+
+          const data = await response.json();
+          
+          // Update the current interview session with the returned data
+          if (data.session) {
+            set({ currentInterview: data.session });
+          }
+          
+          set({ isSubmitting: false });
+          return data;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          set({ error: errorMessage, isSubmitting: false });
+          throw error;
+        }
+      },
+
+      // New method for submitting multiple answers at once (based on your API)
+      submitMultipleAnswers: async (sessionId: string, answers: Array<{ roundIndex: number; questionIndex: number; answer: string }>, authToken?: string): Promise<any> => {
+        set({ isSubmitting: true, error: null });
+
+        try {
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+          };
+          
+          if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+          }
+
+          const response = await fetch(`${API_BASE_URL}/job/${sessionId}/submit`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ answers })
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to submit answers');
+          }
+
+          const data = await response.json();
+          
+          // Update the current interview session with the returned data
+          if (data.session) {
+            set({ currentInterview: data.session });
+          }
+          
+          set({ isSubmitting: false });
+          return data;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          set({ error: errorMessage, isSubmitting: false });
+          throw error;
+        }
+      },
+
       setCurrentRound: (roundIndex: number) => {
         const { currentInterview } = get();
         if (currentInterview && roundIndex >= 0 && roundIndex < currentInterview.rounds.length) {
@@ -145,36 +223,26 @@ const useExamStore = create<ExamStoreState>()(
         return null;
       },
 
+      // Updated submitRoundAnswers to work with new API structure
       submitRoundAnswers: async (sessionId: string, roundIndex: number, answers: string[], authToken?: string): Promise<any> => {
-        set({ isSubmitting: true, error: null });
-
-        try {
-          const headers: Record<string, string> = {
-            'Content-Type': 'application/json'
-          };
-          
-          if (authToken) {
-            headers['Authorization'] = `Bearer ${authToken}`;
-          }
-
-          const response = await fetch(`${API_BASE_URL}/job/interview/${sessionId}/round/${roundIndex}/answers`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ answers })
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to submit round answers');
-          }
-
-          const data = await response.json();
-          set({ isSubmitting: false });
-          return data;
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          set({ error: errorMessage, isSubmitting: false });
-          throw error;
+        const { currentInterview } = get();
+        if (!currentInterview) {
+          throw new Error('No active interview session');
         }
+
+        const currentRound = currentInterview.rounds[roundIndex];
+        if (!currentRound) {
+          throw new Error('Invalid round index');
+        }
+
+        // Convert answers array to the format expected by the API
+        const formattedAnswers = answers.map((answer, questionIndex) => ({
+          roundIndex,
+          questionIndex,
+          answer
+        }));
+
+        return get().submitMultipleAnswers(sessionId, formattedAnswers, authToken);
       },
 
       completeInterview: async (sessionId: string, authToken?: string): Promise<InterviewSession> => {
@@ -230,6 +298,23 @@ const useExamStore = create<ExamStoreState>()(
         const { userAnswers } = get();
         const newAnswers = [...userAnswers];
         newAnswers[questionIndex] = answer;
+        set({ userAnswers: newAnswers });
+      },
+
+      // Helper method to update answer for interview with round and question indices
+      updateInterviewAnswer: (roundIndex: number, questionIndex: number, answer: string) => {
+        const { currentInterview, userAnswers } = get();
+        if (!currentInterview) return;
+
+        // Calculate the absolute question index across all rounds
+        let absoluteIndex = 0;
+        for (let i = 0; i < roundIndex; i++) {
+          absoluteIndex += currentInterview.rounds[i].questions.length;
+        }
+        absoluteIndex += questionIndex;
+
+        const newAnswers = [...userAnswers];
+        newAnswers[absoluteIndex] = answer;
         set({ userAnswers: newAnswers });
       },
 

@@ -1,4 +1,4 @@
-// exam.ts
+// exam.ts - Updated interfaces
 export interface Question {
   question: string;
   userAnswer?: string;
@@ -92,6 +92,7 @@ export interface InterviewSession {
   createdAt: string;
   updatedAt: string;
   __v: number;
+  behavioralMetrics?: BehavioralMetrics;
 }
 
 export interface StartExamRequest {
@@ -121,6 +122,31 @@ export interface SubmitAnswersRequest {
 export interface SubmitAnswersResponse {
   message: string;
   isCompleted: boolean;
+}
+
+// New interfaces for interview answer submission
+export interface SingleAnswerRequest {
+  roundIndex: number;
+  questionIndex: number;
+  answer: string;
+}
+
+export interface SingleAnswerResponse {
+  message: string;
+  session: InterviewSession;
+}
+
+export interface MultipleAnswersRequest {
+  answers: Array<{
+    roundIndex: number;
+    questionIndex: number;
+    answer: string;
+  }>;
+}
+
+export interface MultipleAnswersResponse {
+  message: string;
+  session: InterviewSession;
 }
 
 export interface CompleteExamResponse {
@@ -183,12 +209,17 @@ export interface ExamStoreState {
   completeExam: (sessionId: string, authToken: string) => Promise<ExamSession>;
   generateSummary: (sessionId: string, authToken: string) => Promise<ExamSession>;
   
-  // New interview methods
+  // Interview methods
   startInterview: (company: string, role: string, experience: string, authToken?: string) => Promise<InterviewSession>;
   setCurrentRound: (roundIndex: number) => void;
   getCurrentRound: () => Round | null;
   submitRoundAnswers: (sessionId: string, roundIndex: number, answers: string[], authToken?: string) => Promise<any>;
   completeInterview: (sessionId: string, authToken?: string) => Promise<InterviewSession>;
+  
+  // New interview answer submission methods
+  submitSingleAnswer: (sessionId: string, roundIndex: number, questionIndex: number, answer: string, authToken?: string) => Promise<SingleAnswerResponse>;
+  submitMultipleAnswers: (sessionId: string, answers: Array<{ roundIndex: number; questionIndex: number; answer: string }>, authToken?: string) => Promise<MultipleAnswersResponse>;
+  updateInterviewAnswer: (roundIndex: number, questionIndex: number, answer: string) => void;
   
   // Video and metrics methods
   addVideoFrame: (sessionId: string, frameData: VideoFrameData) => Promise<AddVideoFrameResponse | void>;
