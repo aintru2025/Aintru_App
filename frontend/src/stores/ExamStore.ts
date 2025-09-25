@@ -4,8 +4,11 @@ import { devtools } from 'zustand/middleware';
 import type { 
   ExamStoreState, 
   ExamSession, 
+  InterviewSession,
   StartExamRequest,
   StartExamResponse,
+  StartInterviewRequest,
+  StartInterviewResponse,
   SubmitAnswersRequest,
   SubmitAnswersResponse,
   CompleteExamResponse,
@@ -14,7 +17,8 @@ import type {
   AddVideoFrameResponse,
   VideoMetricsResponse,
   BehavioralMetrics,
-  Question
+  Question,
+  Round
 } from './exam';
 
 const API_BASE_URL = 'http://localhost:3000/api';
@@ -23,10 +27,13 @@ const useExamStore = create<ExamStoreState>()(
   devtools(
     (set, get) => ({
       currentExam: null,
+      currentInterview: null,
       examSessions: [],
+      interviewSessions: [],
       loading: false,
       error: null,
       currentQuestionIndex: 0,
+      currentRoundIndex: 0,
       userAnswers: [],
       timeRemaining: null,
       isSubmitting: false,
@@ -35,6 +42,7 @@ const useExamStore = create<ExamStoreState>()(
       setError: (error: string | null) => set({ error }),
       clearError: () => set({ error: null }),
 
+      // Existing exam methods
       startExam: async (examType: string, authToken: string): Promise<ExamSession> => {
         set({ loading: true, error: null });
         
@@ -70,10 +78,151 @@ const useExamStore = create<ExamStoreState>()(
         }
       },
 
+      // New interview methods
+      startInterview: async (company: string, role: string, experience: string, authToken?: string): Promise<InterviewSession> => {
+        set({ loading: true, error: null });
+        
+        try {
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+          };
+          
+          if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+          }
+
+          const response = await fetch(`${API_BASE_URL}/job/interview/start`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ company, role, experience } as StartInterviewRequest)
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to start interview');
+          }
+
+          const data: StartInterviewResponse = await response.json();
+          
+          if (!data.success) {
+            throw new Error('Interview start failed');
+          }
+
+          // Initialize answers for all questions across all rounds
+          const totalQuestions = data.session.rounds.reduce((total, round) => total + round.questions.length, 0);
+          
+          set({
+            currentInterview: data.session,
+            currentRoundIndex: 0,
+            currentQuestionIndex: 0,
+            userAnswers: new Array(totalQuestions).fill(''),
+            timeRemaining: data.session.totalDuration * 60,
+            loading: false
+          });
+
+          return data.session;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          set({ error: errorMessage, loading: false });
+          throw error;
+        }
+      },
+
+      setCurrentRound: (roundIndex: number) => {
+        const { currentInterview } = get();
+        if (currentInterview && roundIndex >= 0 && roundIndex < currentInterview.rounds.length) {
+          set({ 
+            currentRoundIndex: roundIndex,
+            currentQuestionIndex: 0 // Reset to first question of the round
+          });
+        }
+      },
+
+      getCurrentRound: (): Round | null => {
+        const { currentInterview, currentRoundIndex } = get();
+        if (currentInterview?.rounds?.[currentRoundIndex]) {
+          return currentInterview.rounds[currentRoundIndex];
+        }
+        return null;
+      },
+
+      submitRoundAnswers: async (sessionId: string, roundIndex: number, answers: string[], authToken?: string): Promise<any> => {
+        set({ isSubmitting: true, error: null });
+
+        try {
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+          };
+          
+          if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+          }
+
+          const response = await fetch(`${API_BASE_URL}/job/interview/${sessionId}/round/${roundIndex}/answers`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ answers })
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to submit round answers');
+          }
+
+          const data = await response.json();
+          set({ isSubmitting: false });
+          return data;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          set({ error: errorMessage, isSubmitting: false });
+          throw error;
+        }
+      },
+
+      completeInterview: async (sessionId: string, authToken?: string): Promise<InterviewSession> => {
+        set({ loading: true, error: null });
+
+        try {
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+          };
+          
+          if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+          }
+
+          const response = await fetch(`${API_BASE_URL}/job/interview/${sessionId}/complete`, {
+            method: 'POST',
+            headers
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to complete interview');
+          }
+
+          const data = await response.json();
+          
+          set({
+            currentInterview: { ...get().currentInterview!, isCompleted: true },
+            loading: false
+          });
+
+          return data.session;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          set({ error: errorMessage, loading: false });
+          throw error;
+        }
+      },
+
       setCurrentQuestion: (index: number) => {
-        const { currentExam } = get();
+        const { currentExam, currentInterview, currentRoundIndex } = get();
+        
         if (currentExam && index >= 0 && index < currentExam.totalQuestions) {
           set({ currentQuestionIndex: index });
+        } else if (currentInterview) {
+          const currentRound = currentInterview.rounds[currentRoundIndex];
+          if (currentRound && index >= 0 && index < currentRound.questions.length) {
+            set({ currentQuestionIndex: index });
+          }
         }
       },
 
@@ -235,9 +384,15 @@ const useExamStore = create<ExamStoreState>()(
       setTimeRemaining: (time: number) => set({ timeRemaining: time }),
 
       goToNextQuestion: () => {
-        const { currentQuestionIndex, currentExam } = get();
+        const { currentQuestionIndex, currentExam, currentInterview, currentRoundIndex } = get();
+        
         if (currentExam && currentQuestionIndex < currentExam.totalQuestions - 1) {
           set({ currentQuestionIndex: currentQuestionIndex + 1 });
+        } else if (currentInterview) {
+          const currentRound = currentInterview.rounds[currentRoundIndex];
+          if (currentRound && currentQuestionIndex < currentRound.questions.length - 1) {
+            set({ currentQuestionIndex: currentQuestionIndex + 1 });
+          }
         }
       },
 
@@ -258,18 +413,41 @@ const useExamStore = create<ExamStoreState>()(
         isSubmitting: false
       }),
 
+      resetInterview: () => set({
+        currentInterview: null,
+        currentRoundIndex: 0,
+        currentQuestionIndex: 0,
+        userAnswers: [],
+        timeRemaining: null,
+        error: null,
+        loading: false,
+        isSubmitting: false
+      }),
+
       getCurrentQuestion: (): Question | null => {
-        const { currentExam, currentQuestionIndex } = get();
+        const { currentExam, currentInterview, currentQuestionIndex, currentRoundIndex } = get();
+        
         if (currentExam?.questions?.[currentQuestionIndex]) {
           return currentExam.questions[currentQuestionIndex];
+        } else if (currentInterview) {
+          const currentRound = currentInterview.rounds[currentRoundIndex];
+          if (currentRound?.questions?.[currentQuestionIndex]) {
+            return currentRound.questions[currentQuestionIndex];
+          }
         }
         return null;
       },
 
       getProgress: (): number => {
-        const { currentQuestionIndex, currentExam } = get();
+        const { currentQuestionIndex, currentExam, currentInterview, currentRoundIndex } = get();
+        
         if (currentExam && currentExam.totalQuestions > 0) {
           return ((currentQuestionIndex + 1) / currentExam.totalQuestions) * 100;
+        } else if (currentInterview) {
+          const currentRound = currentInterview.rounds[currentRoundIndex];
+          if (currentRound && currentRound.questions.length > 0) {
+            return ((currentQuestionIndex + 1) / currentRound.questions.length) * 100;
+          }
         }
         return 0;
       },
@@ -280,9 +458,21 @@ const useExamStore = create<ExamStoreState>()(
       },
 
       isAllAnswered: (): boolean => {
-        const { userAnswers, currentExam } = get();
-        if (!currentExam) return false;
-        return userAnswers.filter(answer => answer.trim() !== '').length === currentExam.totalQuestions;
+        const { userAnswers, currentExam, currentInterview, currentRoundIndex } = get();
+        
+        if (currentExam) {
+          return userAnswers.filter(answer => answer.trim() !== '').length === currentExam.totalQuestions;
+        } else if (currentInterview) {
+          const currentRound = currentInterview.rounds[currentRoundIndex];
+          if (currentRound) {
+            const roundStartIndex = currentInterview.rounds
+              .slice(0, currentRoundIndex)
+              .reduce((acc, round) => acc + round.questions.length, 0);
+            const roundAnswers = userAnswers.slice(roundStartIndex, roundStartIndex + currentRound.questions.length);
+            return roundAnswers.filter(answer => answer.trim() !== '').length === currentRound.questions.length;
+          }
+        }
+        return false;
       },
 
       getFormattedTime: (): string => {
