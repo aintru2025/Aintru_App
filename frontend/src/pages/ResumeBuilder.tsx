@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import useResumeStore from '../stores/ResumeStore';
 import { 
   FileText, 
   Download, 
@@ -11,15 +12,31 @@ import {
   CheckCircle, 
   AlertCircle,
   Plus,
-  Trash2
+  Trash2,
+  Upload,
+  Loader2
 } from 'lucide-react';
 import logo from '../assets/aintru-logo.png';
 
 const ResumeBuilder = () => {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, getToken } = useAuthStore();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Resume Store
+  const {
+    isUploading,
+    error,
+    successMessage,
+    improvedResumeUrl,
+    uploadAndImproveResume,
+    clearMessages,
+    reset
+  } = useResumeStore();
+
   const [atsScore, setAtsScore] = useState(78);
   const [activeSection, setActiveSection] = useState('personal');
+  const [showUploadSection, setShowUploadSection] = useState(false);
 
   // Authentication check
   useEffect(() => {
@@ -29,6 +46,30 @@ const ResumeBuilder = () => {
       });
     }
   }, [isAuthenticated, navigate]);
+
+  // Handle file upload
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const token = getToken();
+      await uploadAndImproveResume(file, token);
+    } catch (error) {
+      console.error('Upload failed:', error);
+    }
+  };
+
+  // Download improved resume
+  const handleDownload = () => {
+    if (improvedResumeUrl) {
+      const link = document.createElement('a');
+      link.href = improvedResumeUrl;
+      link.download = 'improved_resume.pdf';
+      link.click();
+    }
+  };
+
   const [resumeData, setResumeData] = useState({
     personal: {
       name: 'Alex Johnson',
@@ -96,16 +137,92 @@ const ResumeBuilder = () => {
             <p className="text-gray-600 mt-2">Create an ATS-optimized resume that gets noticed</p>
           </div>
           <div className="flex space-x-4">
+            <button 
+              onClick={() => setShowUploadSection(!showUploadSection)}
+              className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Improve Existing</span>
+            </button>
             <button className="flex items-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
               <Eye className="w-4 h-4" />
               <span>Preview</span>
             </button>
-            <button className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+            <button 
+              onClick={handleDownload}
+              disabled={!improvedResumeUrl}
+              className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <Download className="w-4 h-4" />
               <span>Download PDF</span>
             </button>
           </div>
         </div>
+
+        {/* Upload Section */}
+        {showUploadSection && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-6 shadow-sm mb-8"
+          >
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload & Improve Existing Resume</h3>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 mb-2">Upload your current resume (PDF only) and get AI-powered improvements</p>
+                {error && (
+                  <div className="flex items-center space-x-2 text-red-600 mb-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="text-sm">{error}</span>
+                  </div>
+                )}
+                {successMessage && (
+                  <div className="flex items-center space-x-2 text-green-600 mb-2">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="text-sm">{successMessage}</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center space-x-4">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Improving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      <span>Choose PDF</span>
+                    </>
+                  )}
+                </button>
+                {(error || successMessage) && (
+                  <button
+                    onClick={() => {
+                      clearMessages();
+                      reset();
+                    }}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* ATS Score Card */}
         <motion.div
