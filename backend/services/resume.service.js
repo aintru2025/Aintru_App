@@ -9,7 +9,7 @@ const JobInterview = require("../models/JobInterview"); // ✅ Correct model for
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 const TMP_DIR = path.join(__dirname, "../tmp_resume");
 fs.ensureDirSync(TMP_DIR);
