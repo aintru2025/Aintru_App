@@ -26,6 +26,9 @@ app.use(cors({
   origin: 'http://localhost:5173',
   credentials: true
 }));
+
+app.use('/api/resume', resumeRoutes);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -90,7 +93,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/interview', interviewRoutes);
 app.use('/api/interviewFlow', interviewFlowRoutes);
-app.use('/api/resume', resumeRoutes);
+
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/suggestions', suggestionsRoutes);
 app.use('/api/dashboard', dashboardRoutes);

@@ -2,12 +2,18 @@ const resumeService = require("../services/resume.service");
 
 async function improveResume(req, res) {
   try {
+    console.log("Query:", req.query);
+    console.log("File:", req.file);
+    console.log("Body:", req.body);
+
     const userId = req.userId; // assume auth middleware sets req.userId
+    console.log("User ID:", userId);
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     // optional: exam/job mode - default job
     const mode = (req.query.mode || "latex").toLowerCase(); // 'latex' or 'direct'
     if (!["latex", "direct"].includes(mode)) {
+      console.error("Invalid mode:", mode);
       return res
         .status(400)
         .json({ error: 'mode must be "latex" or "direct"' });
@@ -15,6 +21,7 @@ async function improveResume(req, res) {
 
     // Multer gave us file buffer in req.file
     if (!req.file) {
+      console.error("No file uploaded");
       return res
         .status(400)
         .json({ error: "Resume PDF file is required (field name: resume)" });

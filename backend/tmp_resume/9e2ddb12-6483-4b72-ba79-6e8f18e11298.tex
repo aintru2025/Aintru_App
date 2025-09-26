@@ -1,0 +1,144 @@
+```latex
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{enumitem}
+\usepackage{ragged2e}
+\usepackage{hyperref}
+\usepackage[left=0.75in, right=0.75in, top=0.5in, bottom=0.5in]{geometry}
+\usepackage{fontawesome5} % For icons
+
+% --- Custom Commands for Resume Styling ---
+% Section header
+\newcommand{\sectionheader}[1]{%
+  \vspace{1.5ex}\noindent\textbf{\Large #1}%
+  \par\rule{\textwidth}{0.8pt}\vspace{0.5ex}%
+}
+
+% Subheading for Job/Project titles (e.g., Role, Company | Location, Dates)
+\newcommand{\subheading}[4]{%
+  \vspace{0.5ex}\noindent\textbf{#1}\hfill\textbf{#2}\par%
+  \noindent\textit{#3}\hfill\textit{#4}\par\vspace{-0.5ex}%
+}
+
+% Hyperlink styling for better print and PDF view
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=blue,
+    pdftitle={Harsh Agarwal Resume},
+    pdfauthor={Harsh Agarwal}
+}
+
+\begin{document}
+\pagestyle{empty} % No page numbers
+
+% --- Contact Information ---
+\begin{center}
+    \vspace{-0.2in}
+    \textbf{\Huge Harsh Agarwal} \\
+    \vspace{1pt}
+    \small \faPhone\ +91-9330557076 \textbar \faEnvelope\ \href{mailto:harshagarwal81528@gmail.com}{harshagarwal81528@gmail.com} \textbar \faLinkedin\ \href{https://linkedin.com/in/harshagarwal963}{linkedin.com/in/harshagarwal963} \textbar \faGithub\ \href{https://github.com/Harsh0369}{github.com/Harsh0369}
+\end{center}
+
+% --- Summary ---
+\sectionheader{Summary}
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item Highly motivated and results-driven Full-Stack Developer with a strong foundation in MERN stack, data structures, and algorithms.
+    \item Proven ability to build scalable backend architectures, optimize API performance, and develop real-time applications.
+    \item Demonstrated strong technical problem-solving, system design acumen, practical debugging skills, and leadership through academic projects, open-source contributions, and hackathon achievements.
+    \item Eager to leverage technical expertise and collaborative spirit in a challenging Software Development Engineer role.
+\end{itemize}
+
+% --- Skills ---
+\sectionheader{Skills}
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item \textbf{Languages:} Java, Python, C++, JavaScript, C
+    \item \textbf{Frameworks:} Django, React.js, Express.js, React Native
+    \item \textbf{Data Technologies:} Pandas, NumPy, Scikit-learn, MongoDB, Redis, PostgreSQL
+    \item \textbf{Web Technologies:} REST APIs, GraphQL, WebSocket, Tailwind CSS
+    \item \textbf{Tools:} Git, Docker, Firebase, Vite, Postman
+\end{itemize}
+
+% --- Experience ---
+\sectionheader{Experience}
+\subheading{FIST-TBI, IIT Patna}{Patna, India}
+            {Fintech Research Intern}{June 2025 – July 2025}
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item Researched payment solutions for Bihar startups under IIT guidance, analyzing fintech trends and emerging technologies in digital payment systems and blockchain integration.
+    \item Contributed to backend development using Node.js and Python frameworks for emerging fintech companies, implementing secure APIs and database optimization.
+\end{itemize}
+
+\subheading{Karyakaram}{Remote}
+            {Full-Stack Developer Intern}{June 2025 – Present}
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item Built complete backend architecture for React Native event management platform using Express.js, PostgreSQL, and Socket.IO, focusing on real-time chat system for group and solo chats.
+    \item Integrated Redux for state management and JWT authentication, tested 30+ REST API endpoints with comprehensive frontend-backend integration and error handling.
+\end{itemize}
+
+\subheading{Social Summer of Code}{Remote}
+            {Open Source Contributor}{May 2025 – Present}
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item Developed React.js event platform with venue search and filtering using JavaScript, implemented Redis caching to optimize API latency by 25\% and enhanced user experience.
+\end{itemize}
+
+\subheading{GirlScript Summer of Code}{Remote}
+            {Backend Developer}{May 2024 – Sep. 2024}
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item Accelerated Node.js API response by 40\% using Redis caching and MongoDB optimization.
+    \item Secured 500+ Daily Active Users (DAU) with JWT authentication and rate limiting implementation.
+\end{itemize}
+
+% --- Projects ---
+\sectionheader{Projects}
+\subheading{Co.Lab: Real-Time Code Collaboration}{\href{https://github.com/Harsh0369/Co.Lab}{GitHub}}
+            {MERN Stack, Gemini API, Web Containers}{2025}
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item Developed multi-user editor with live code execution, Redis session management (0.5s authentication), and AI suggestions via Gemini API.
+    \item Reduced debug time by 40\% for 100+ users with web container-based runtime for Python/JS.
+\end{itemize}
+
+\subheading{Cab Booking System}{\href{https://github.com/Harsh0369/Cab-Booking-System}{GitHub}}
+            {MERN Stack, Mapbox API}{2024}
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item Implemented core features including live tracking (98\% accuracy), a 2.3s booking flow, and Razorpay integration (99\% success).
+\end{itemize}
+
+\subheading{URL Shortener}{\href{https://github.com/Harsh0369/URL-Shortener}{GitHub}}
+            {MERN Stack, Redis}{2024}
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item Engineered for high performance with 50ms redirects, custom analytics dashboard, JWT authentication, and rate limiting.
+\end{itemize}
+
+% --- Education ---
+\sectionheader{Education}
+\subheading{Institute of Technology, Guru Ghasidas University (CU)}{Bilaspur, India}
+            {Bachelor of Technology in Information Technology}{Oct. 2023 – Present}
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item GPA: 8.37/10.0
+    \item Coursework: Operating Systems, Data Structures, Algorithms, OOP in C++, Computer Architecture
+\end{itemize}
+
+% --- Awards ---
+\sectionheader{Awards}
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item \textbf{5th Position} – Code of Phoenix Hackathon (Sentiment Analysis Platform for Social Media Advisory) \hfill Feb. 2025
+    \item \textbf{8th Position} – Level SuperMind Hackathon (Astrology-based User Query Advisory Platform) \hfill Jan. 2025
+\end{itemize}
+
+% --- Certifications ---
+\sectionheader{Certifications}
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item Postman API Expert – Postman Certification \hfill Oct. 2024
+\end{itemize}
+
+% --- Leadership & Volunteering ---
+\sectionheader{Leadership \& Volunteering}
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt]
+    \item \textbf{GFG Student Chapter} – Lead \hfill May 2025 – Present
+    \item \textbf{Google Developers Group} – Web Development Executive \hfill 2024 – Present
+    \item \textbf{NSS Volunteer} – National Service Scheme \hfill 2023 – Present
+\end{itemize}
+
+\end{document}
+```
