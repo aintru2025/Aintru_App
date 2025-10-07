@@ -1,0 +1,133 @@
+```latex
+\documentclass[10pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{geometry}
+\geometry{a4paper, margin=0.7in}
+\usepackage{ragged2e} % For \RaggedRight
+\usepackage{enumitem} % For customizable lists
+\usepackage{hyperref} % For clickable links
+\usepackage{titlesec} % For customizing section titles
+
+% Customizing section titles
+\titlespacing*{\section}{0pt}{1.5\baselineskip}{0.5\baselineskip}
+\titleformat{\section}{\vspace{-1.5em}\normalfont\Large\bfseries}{}{0em}{}[\titlerule]
+\titlespacing*{\subsection}{0pt}{1\baselineskip}{0.5\baselineskip}
+\titleformat{\subsection}{\normalfont\bfseries}{}{0em}{}
+
+% Custom itemize environment for resume bullets
+\newlist{resumeitems}{itemize}{1}
+\setlist[resumeitems]{label=\textbullet, leftmargin=*, itemsep=0.2em, parsep=0em, topsep=0.2em}
+
+% Custom commands for consistency
+\newcommand{\resitem}[1]{\item \RaggedRight #1}
+\newcommand{\role}[1]{\textbf{#1}}
+\newcommand{\company}[1]{#1}
+\newcommand{\location}[1]{\textit{#1}}
+\newcommand{\dates}[1]{\hfill \textit{#1}}
+
+% Header formatting
+\usepackage{fancyhdr}
+\pagestyle{plain} % No header/footer by default, we'll make our own.
+\fancypagestyle{firstpage}{
+  \fancyhf{} % Clear all header and footer fields
+  \renewcommand{\headrulewidth}{0pt} % No rule
+  \fancyheadoffset{0in} % No offset
+  \fancyhead[C]{\centering \textbf{\Huge Harsh Agarwal}\\[0.5em]
+  \normalsize \href{tel:+919330557076}{+91-9330557076} \textbullet{} \href{mailto:harshagarwal81528@gmail.com}{harshagarwal81528@gmail.com} \textbullet{} \href{https://linkedin.com/in/harshagarwal963}{linkedin.com/in/harshagarwal963} \textbullet{} \href{https://github.com/Harsh0369}{github.com/Harsh0369}}
+}
+
+\begin{document}
+\thispagestyle{firstpage} % Apply custom header to the first page
+
+\section*{Summary}
+\begin{resumeitems}
+    \resitem{Highly motivated and results-oriented Software Engineer with a strong foundation in \textbf{Data Structures, Algorithms, and Object-Oriented Programming}. Proven ability in \textbf{full-stack and backend development}, delivering scalable solutions with a keen eye for \textbf{system design, performance optimization, and robust error handling}.}
+    \resitem{Experienced in building real-time applications, secure APIs, and enhancing user experience, with a track record of \textbf{quantifiable impact} and contributing innovative solutions to complex technical challenges.}
+\end{resumeitems}
+
+\section*{Technical Skills}
+\begin{itemize}[leftmargin=*, label={}]
+    \item \textbf{Languages:} Java, Python, C++, JavaScript, C
+    \item \textbf{Frameworks:} Django, React.js, Express.js, React Native
+    \item \textbf{Data Technologies:} Pandas, NumPy, Scikit-learn, MongoDB, Redis, PostgreSQL
+    \item \textbf{Web Technologies:} REST APIs, GraphQL, WebSocket, Tailwind CSS, Node.js
+    \item \textbf{Tools:} Git, Docker, Firebase, Vite, Postman
+\end{itemize}
+
+\section*{Experience}
+\subsection*{\role{Fintech Research Intern} \dates{June 2025 – July 2025}}
+\company{FIST-TBI, IIT Patna} \location{Patna, India}
+\begin{resumeitems}
+    \resitem{Researched payment solutions for Bihar startups under IIT guidance, analyzing fintech trends and emerging technologies in digital payment systems and blockchain integration.}
+    \resitem{Contributed to backend development using Node.js and Python frameworks, implementing secure APIs and database optimization for emerging fintech companies.}
+\end{resumeitems}
+
+\subsection*{\role{Full-Stack Developer Intern} \dates{June 2025 – Present}}
+\company{Karyakaram} \location{Remote}
+\begin{resumeitems}
+    \resitem{Architected complete backend for React Native event management platform using Express.js, PostgreSQL, and Socket.IO, emphasizing real-time group and solo chat systems.}
+    \resitem{Integrated Redux for state management and JWT authentication; rigorously tested 30+ REST API endpoints with comprehensive frontend-backend integration and robust error handling.}
+\end{resumeitems}
+
+\subsection*{\role{Open Source Contributor} \dates{May 2025 – Present}}
+\company{Social Summer of Code} \location{Remote}
+\begin{resumeitems}
+    \resitem{Developed React.js event platform with venue search and filtering, implementing \textbf{Redis caching to optimize API latency by 25\%} and enhance user experience.}
+\end{resumeitems}
+
+\subsection*{\role{Backend Developer} \dates{May 2024 – Sep. 2024}}
+\company{GirlScript Summer of Code} \location{Remote}
+\begin{resumeitems}
+    \resitem{\textbf{Accelerated Node.js API response by 40\%} using Redis caching and MongoDB optimization techniques.}
+    \resitem{Secured \textbf{500+ Daily Active Users} by implementing JWT authentication and effective rate limiting mechanisms.}
+\end{resumeitems}
+
+\section*{Projects}
+\subsection*{\role{Co.Lab: Real-Time Code Collaboration} \dates{2025}}
+\textit{MERN Stack, Gemini API, Web Containers}
+\begin{resumeitems}
+    \resitem{Engineered multi-user editor with live code execution, Redis session management achieving \textbf{0.5s authentication}, and AI suggestions via Gemini API.}
+    \resitem{\textbf{Reduced debug time by 40\%} for 100+ users by implementing a web container-based runtime for Python/JS execution.}
+\end{resumeitems}
+
+\subsection*{\role{Cab Booking System} \dates{2024}}
+\textit{MERN Stack, Mapbox API}
+\begin{resumeitems}
+    \resitem{Implemented live tracking with \textbf{98\% accuracy}, streamlined a \textbf{2.3s booking flow}, and integrated Razorpay for payments with \textbf{99\% success rate}.}
+\end{resumeitems}
+
+\subsection*{\role{URL Shortener} \dates{2024}}
+\textit{MERN Stack, Redis}
+\begin{resumeitems}
+    \resitem{Achieved \textbf{50ms redirects}, developed a custom analytics dashboard, and secured user interactions with JWT authentication and rate limiting.}
+\end{resumeitems}
+
+\section*{Education}
+\subsection*{\role{Bachelor of Technology in Information Technology} \dates{Oct. 2023 – Present}}
+\company{Institute of Technology, Guru Ghasidas University (CU)} \location{Bilaspur, India}
+\begin{resumeitems}
+    \resitem{GPA: 8.37/10.0}
+    \resitem{Coursework: Operating Systems, Data Structures, Algorithms, OOP in C++, Computer Architecture}
+\end{resumeitems}
+
+\section*{Certifications}
+\begin{resumeitems}
+    \resitem{\textbf{Postman API Expert} – Postman Certification (Oct. 2024)}
+\end{resumeitems}
+
+\section*{Achievements}
+\begin{resumeitems}
+    \resitem{\textbf{5th Position} – Code of Phoenix Hackathon (Sentiment Analysis Platform for Social Media Advisory), Feb. 2025}
+    \resitem{\textbf{8th Position} – Level SuperMind Hackathon (Astrology-based User Query Advisory Platform), Jan. 2025}
+\end{resumeitems}
+
+\section*{Leadership \& Volunteering}
+\begin{resumeitems}
+    \resitem{\textbf{GFG Student Chapter} – Lead (May 2025 – Present)}
+    \resitem{\textbf{Google Developers Group} – Web Development Executive (2024 – Present)}
+    \resitem{\textbf{NSS Volunteer} – National Service Scheme (2023 – Present)}
+\end{resumeitems}
+
+\end{document}
+```

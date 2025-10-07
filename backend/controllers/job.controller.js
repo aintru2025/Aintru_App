@@ -42,12 +42,12 @@ const submitAnswer = async (req, res) => {
     const { sessionId } = req.params;
     const { roundIndex, questionIndex, answer } = req.body;
 
-    const session = await jobService.submitAnswer(
-      sessionId,
+    const session = await jobService.submitAnswer({
+      interviewId: sessionId,
       roundIndex,
       questionIndex,
-      answer
-    );
+      userAnswer: answer,
+    });
 
     res.json({ message: "Answer submitted", session });
   } catch (error) {
@@ -56,6 +56,7 @@ const submitAnswer = async (req, res) => {
       .json({ message: "Error submitting answer", error: error.message });
   }
 };
+
 
 const submitAllAnswers = async (req, res) => {
   try {

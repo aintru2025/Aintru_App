@@ -1,5 +1,16 @@
 const mongoose = require("mongoose");
 
+
+const CrossQuestionSchema = new mongoose.Schema(
+  {
+    question: { type: String, required: true },
+    userAnswer: { type: String, default: "" },
+    score: { type: Number, default: null },
+    feedback: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
 const QuestionSchema = new mongoose.Schema(
   {
     question: { type: String, required: true },
@@ -7,6 +18,7 @@ const QuestionSchema = new mongoose.Schema(
     // optional evaluation/score per question
     score: { type: Number, default: null },
     feedback: { type: String, default: "" },
+    crossQuestions: [CrossQuestionSchema],
   },
   { timestamps: true }
 );

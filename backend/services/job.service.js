@@ -137,20 +137,95 @@ async function startJobInterview(userId, company = "Target Company", role = "Sof
 /**
  * Submit a single answer for a given question in a round
  */
-async function submitAnswer(sessionId, roundIndex, questionIndex, answer) {
-  const session = await JobInterview.findById(sessionId);
-  if (!session) throw new Error("Session not found");
+const MAX_CROSS_QUESTIONS = 3;
 
-  if (!session.rounds[roundIndex]) throw new Error("Invalid round index");
-  if (!session.rounds[roundIndex].questions[questionIndex])
-    throw new Error("Invalid question index");
+async function submitAnswer({
+  interviewId,
+  roundIndex,
+  questionIndex,
+  userAnswer,
+}) {
+  const interview = await JobInterview.findById(interviewId);
+  if (!interview) throw new Error("Interview not found");
 
-  // save user answer
-  session.rounds[roundIndex].questions[questionIndex].userAnswer = answer;
-  await session.save();
+  const round = interview.rounds[roundIndex];
+  if (!round) throw new Error("Invalid round index");
 
-  return session;
+  const question = round.questions[questionIndex];
+  if (!question) throw new Error("Invalid question index");
+
+  // Step 1️⃣: Evaluate the answer using Gemini
+  const prompt = `Question: ${question.question}\nAnswer: ${userAnswer}\nEvaluate answer quality, give score (0–10) and one-line feedback in JSON:
+  { "score": <number>, "feedback": "<short>" }`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+
+  let evaluation;
+  try {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}") + 1;
+    evaluation = JSON.parse(text.slice(start, end));
+  } catch {
+    evaluation = { score: 5, feedback: "Could not parse evaluation." };
+  }
+
+  // Step 2️⃣: Save the user answer + evaluation
+  question.userAnswer = userAnswer;
+  question.score = evaluation.score;
+  question.feedback = evaluation.feedback;
+
+  // Step 3️⃣: Conditionally generate cross-question
+  const unsatisfactory =
+    evaluation.score < 7 ||
+    (evaluation.feedback &&
+      evaluation.feedback.toLowerCase().includes("unsatisfactory"));
+
+  // Count existing cross questions across all rounds
+  const totalCrossQs = interview.rounds.reduce((sum, r) => {
+    return (
+      sum +
+      r.questions.reduce((qsum, q) => qsum + (q.crossQuestions?.length || 0), 0)
+    );
+  }, 0);
+
+  if (unsatisfactory && totalCrossQs < MAX_CROSS_QUESTIONS) {
+    const crossPrompt = `The candidate gave an unsatisfactory answer to:
+Question: ${question.question}
+Answer: ${userAnswer}
+Generate ONE short cross-question to further probe understanding.`;
+
+    const crossRes = await model.generateContent(crossPrompt);
+    const crossText = crossRes.response.text().trim();
+
+    const crossQuestion = {
+      question: crossText,
+      userAnswer: "",
+      score: null,
+      feedback: "",
+    };
+
+    question.crossQuestions.push(crossQuestion);
+  }
+
+  // Step 4️⃣: Save updated interview document
+  await interview.save();
+
+  // Step 5️⃣: Check if interview is complete (all main + cross answered)
+  const allAnswered = interview.rounds.every((r) =>
+    r.questions.every(
+      (q) => q.userAnswer || q.crossQuestions.every((cq) => cq.userAnswer)
+    )
+  );
+
+  if (allAnswered && !interview.isCompleted) {
+    interview.isCompleted = true;
+    await generateSummary(interviewId);
+  }
+
+  return interview;
 }
+
 
 /**
  * Submit all answers at once
@@ -246,16 +321,30 @@ async function evaluateJobInterview(sessionId) {
   const session = await JobInterview.findById(sessionId);
   if (!session) throw new Error("Session not found");
 
-  // Build Q/A pairs across rounds
+  // Build Q/A pairs including cross-questions
   const qnaPairs = [];
-  session.rounds.forEach((r) => {
-    r.questions.forEach((q) => {
-      qnaPairs.push({ question: q.question, answer: q.userAnswer || "Not answered" });
+  session.rounds.forEach((round) => {
+    round.questions.forEach((q) => {
+      // Main question
+      qnaPairs.push({
+        question: q.question,
+        answer: q.userAnswer || "Not answered",
+        qIndex: qnaPairs.length + 1,
+      });
+      // Cross-questions
+      q.crossQuestions?.forEach((cq) => {
+        qnaPairs.push({
+          question: cq.question,
+          answer: cq.userAnswer || "Not answered",
+          qIndex: qnaPairs.length + 1,
+          parentQuestion: q.question,
+        });
+      });
     });
   });
 
   const qnaText = qnaPairs
-    .map((q, idx) => `Q${idx + 1}: ${q.question}\nAnswer: ${q.answer}`)
+    .map((q) => `Q${q.qIndex}: ${q.question}\nAnswer: ${q.answer}`)
     .join("\n\n");
 
   const behavior = session.behavioralMetrics
@@ -266,7 +355,7 @@ async function evaluateJobInterview(sessionId) {
     : "";
 
   const prompt = `You are an interviewer evaluating answers for a ${session.role} role at ${session.company}.
-For each question below, say whether the answer is good/ok/poor, provide a short score (out of 10) and one-line feedback.
+For each main question and its follow-ups (cross questions), say whether the answer is good/ok/poor, provide a short score (out of 10), and one-line feedback.
 ${behavior}
 
 ${qnaText}
@@ -288,7 +377,10 @@ Return your evaluation in JSON array format like:
     const jsonText = text.slice(first, last + 1);
     evaluations = JSON.parse(jsonText);
   } catch (err) {
-    console.warn("Failed to parse evaluations from model, saving raw text as summary", err.message);
+    console.warn(
+      "Failed to parse evaluations from model, saving raw text as summary",
+      err.message
+    );
     session.summary = text;
     session.isCompleted = true;
     session.behavioralMetrics = computeVideoMetrics(session);
@@ -296,21 +388,37 @@ Return your evaluation in JSON array format like:
     return session;
   }
 
-  // Apply evaluations back to questions (match by qIndex)
+  // Apply evaluations back to main questions and cross-questions
   let qCounter = 0;
-  for (const r of session.rounds) {
-    for (const q of r.questions) {
+  for (const round of session.rounds) {
+    for (const q of round.questions) {
       const evalObj = evaluations[qCounter] || null;
       if (evalObj) {
         q.score = typeof evalObj.score === "number" ? evalObj.score : null;
         q.feedback = evalObj.feedback || "";
       }
       qCounter++;
+
+      if (q.crossQuestions?.length) {
+        q.crossQuestions.forEach((cq) => {
+          const crossEval = evaluations[qCounter] || null;
+          if (crossEval) {
+            cq.score =
+              typeof crossEval.score === "number" ? crossEval.score : null;
+            cq.feedback = crossEval.feedback || "";
+          }
+          qCounter++;
+        });
+      }
     }
   }
 
-  // Summarize overall (let Gemini create a human-readable summary)
-  const summaryPrompt = `Based on the evaluations, write a structured performance summary for the candidate interviewing for ${session.role} at ${session.company}. Use the evaluations below and give strengths, weaknesses and suggestions.
+  // Summarize overall performance including cross-questions
+  const summaryPrompt = `Based on the evaluations, write a structured performance summary for the candidate interviewing for ${
+    session.role
+  } at ${
+    session.company
+  }. Include strengths, weaknesses, and suggestions. Explicitly reference cross questions if they were asked.
 
 Evaluations:
 ${JSON.stringify(evaluations, null, 2)}
@@ -334,10 +442,23 @@ async function generateSummary(sessionId) {
   const session = await JobInterview.findById(sessionId);
   if (!session) throw new Error("Session not found");
 
+  // Build Q/A pairs including cross-questions
   const qnaPairs = [];
-  session.rounds.forEach((r) => {
-    r.questions.forEach((q) => {
-      qnaPairs.push({ question: q.question, answer: q.userAnswer || "Not answered", score: q.score ?? null });
+  session.rounds.forEach((round) => {
+    round.questions.forEach((q) => {
+      qnaPairs.push({
+        question: q.question,
+        answer: q.userAnswer || "Not answered",
+        score: q.score ?? null,
+      });
+      q.crossQuestions?.forEach((cq) => {
+        qnaPairs.push({
+          question: cq.question,
+          answer: cq.userAnswer || "Not answered",
+          score: cq.score ?? null,
+          parentQuestion: q.question,
+        });
+      });
     });
   });
 
@@ -348,8 +469,10 @@ async function generateSummary(sessionId) {
     - Avg emotions: ${JSON.stringify(session.behavioralMetrics.avgEmotions)}`
     : "";
 
-  const prompt = `Write a structured performance summary for a ${session.role} interview at ${session.company}.
-Include strengths, weaknesses, areas for improvement and non-verbal cues from video analysis.
+  const prompt = `Write a structured performance summary for a ${
+    session.role
+  } interview at ${session.company}.
+Include strengths, weaknesses, areas for improvement, and non-verbal cues from video analysis. Explicitly mention follow-up/cross questions.
 Q&A:
 ${JSON.stringify(qnaPairs, null, 2)}
 ${behavior}`;
@@ -364,6 +487,7 @@ ${behavior}`;
 
   return session;
 }
+
 
 /**
  * Utility: get session by id
