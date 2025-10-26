@@ -1891,7 +1891,7 @@ const InterviewPhase = () => {
                   </div>
                 </div>
 
-                {currentFaceData.faceDetected && (
+                {/* {currentFaceData.faceDetected && (
                   <div className="absolute bottom-3 left-3 right-3">
                     <div className="bg-black bg-opacity-60 rounded p-2">
                       <div className="text-xs text-white mb-1">Live Emotions:</div>
@@ -1910,7 +1910,7 @@ const InterviewPhase = () => {
                       </div>
                     </div>
                   </div>
-                )}
+                )} */}
               </div>
             ) : (
               // Voice mode JSX - SAME
