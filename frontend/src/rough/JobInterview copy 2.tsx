@@ -11,7 +11,6 @@ import {
   Eye, EyeOff
 } from 'lucide-react';
 import type { VideoFrameData, Round, InterviewSession } from '../stores/exam';
-import { useFaceDetection, type FaceData } from '../config/userFaceDetection';
 
 // Face-api.js types
 declare global {
@@ -221,7 +220,7 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
           faceDetected: true, // Assume face is present
           numFaces: 1,
           emotions: {
-            happy: 0.3 + Math.random() * 0.3,
+            happy: 0.2 + Math.random() * 0.3,
             sad: Math.random() * 0.1,
             neutral: 0.4 + Math.random() * 0.2,
             angry: Math.random() * 0.05,
@@ -360,10 +359,8 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
       clearInterval(faceDetectionIntervalRef.current);
     }
 
-    console.log("Hitting face api")
-
     // Run face detection every 500ms for smooth real-time feedback
-    faceDetectionIntervalRef.current = setInterval(detectFaces, 50);
+    faceDetectionIntervalRef.current = setInterval(detectFaces, 500);
   };
 
   // Stop face detection
@@ -778,8 +775,6 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
     </div>
   );
 
-  loadFaceApiModels();
-
   // Initialize media and start interview
   const startInterviewSession = async () => {
     if (!mode) return;
@@ -861,7 +856,7 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
       mediaStreamRef.current = stream;
   
       let attempts = 0;
-      const maxAttempts = 15;
+      const maxAttempts = 10;
   
       const attach = () => {
         if (videoRef.current) {
@@ -872,9 +867,7 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
             try {
               await videoRef.current?.play();
               console.log("✅ Video playback started");
-              console.log("faceAPI: ", faceApiLoaded)
               if (faceApiLoaded) {
-                console.log("Starting face detection")
                 startFaceDetection();
               }
             } catch (err) {
@@ -885,7 +878,7 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
         } else if (attempts < maxAttempts) {
           attempts++;
           console.warn("videoRef not ready yet, retrying...", attempts);
-          setTimeout(attach, 6000);
+          setTimeout(attach, 15000);
         } else {
           console.error("❌ videoRef never became ready after retries");
         }
@@ -1064,1029 +1057,536 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
   //   });
   // };
 
-  const startTheCalls = () => {
-    if (questionIndex >= aiResponses.length) return;
+  // const startTheCalls = () => {
+  //   if (questionIndex >= aiResponses.length) return;
   
-    // Speak AI question
-    speak(aiResponses[questionIndex], () => {
-      // After speaking, start listening for user's answer
-      listens();
+  //   // Speak AI question
+  //   speak(aiResponses[questionIndex], () => {
+  //     // After speaking, start listening for user's answer
+  //     listens();
       
-      // When user finishes speaking, move to next question
-      if (recognitionRef.current) {
-        recognitionRef.current.onend = () => {
-          setIsListening(false);      // mark listening as finished
-          questionIndex++;             // move to next AI question
-          startTheCalls();             // call next question
-        };
-      }
-    });
-  };
+  //     // When user finishes speaking, move to next question
+  //     if (recognitionRef.current) {
+  //       recognitionRef.current.onend = () => {
+  //         setIsListening(false);      // mark listening as finished
+  //         questionIndex++;             // move to next AI question
+  //         startTheCalls();             // call next question
+  //       };
+  //     }
+  //   });
+  // };
 
   const videoInitializedRef = useRef(false);
 
-  // useEffect(() => {
-  //   if (mode === 'video' && !videoInitializedRef.current) {
-  //     videoInitializedRef.current = true;
-  
-  //     initializeVideoStream(videoRef, mediaStreamRef, startFaceDetection, faceApiLoaded)
-  //       .catch(err => {
-  //         console.error("Video init failed:", err);
-  //         setError(err.message);
-  //       });
-  
-  //     // Cleanup on unmount
-  //     return () => {
-  //       if (mediaStreamRef.current) {
-  //         mediaStreamRef.current.getTracks().forEach(track => track.stop());
-  //         mediaStreamRef.current = null;
-  //       }
-  //       videoInitializedRef.current = false;
-  //     };
-  //   }
-  // }, [mode]);
-
   // Interview Phase
-  // const InterviewPhase = () => {
-  //   console.log("Startted")
+  const InterviewPhase = () => {
+    console.log("Startted")
 
-  //   console.log(videoRef)
-  //   useEffect(() => {
-  //     if (mode === 'video' && !videoInitializedRef.current) {
-  //       videoInitializedRef.current = true;
+    useEffect(() => {
+      if (mode === 'video' && !videoInitializedRef.current) {
+        videoInitializedRef.current = true;
     
-  //       initializeVideoStream(videoRef, mediaStreamRef, startFaceDetection, faceApiLoaded)
-  //         .catch(err => {
-  //           console.error("Video init failed:", err);
-  //           setError(err.message);
-  //         });
+        initializeVideoStream(videoRef, mediaStreamRef, startFaceDetection, faceApiLoaded)
+          .catch(err => {
+            console.error("Video init failed:", err);
+            setError(err.message);
+          });
     
-  //       // Cleanup on unmount
-  //       return () => {
-  //         if (mediaStreamRef.current) {
-  //           mediaStreamRef.current.getTracks().forEach(track => track.stop());
-  //           mediaStreamRef.current = null;
-  //         }
-  //         videoInitializedRef.current = false;
-  //       };
-  //     }
-  //   }, [mode]);
-    
-
-  //   const currentRound = getCurrentRound();
-  //   const currentQuestion = getCurrentQuestion();
-  //   const progress = getProgress();
-    
-  //   // Real API answer submission function
-  //   const handleAnswerSubmit = async (isNextQuestion = true) => {
-  //     if (!currentAnswer.trim() || !currentInterview) return;
-
-  //     setIsSavingAnswer(true);
-  //     try {
-  //       const token = getToken();
-        
-  //       // Submit single answer to real API
-  //       const response = await submitSingleAnswer(
-  //         currentInterview._id, 
-  //         currentRoundIndex, 
-  //         currentQuestionIndex, 
-  //         currentAnswer.trim(), 
-  //         token
-  //       );
-
-  //       console.log('Answer submitted successfully:', response);
-        
-  //       // Update local state
-  //       updateInterviewAnswer(currentRoundIndex, currentQuestionIndex, currentAnswer.trim());
-  //       setCurrentAnswer('');
-        
-  //       // Auto move to next question if requested
-  //       if (isNextQuestion && currentRound && currentQuestionIndex < currentRound.questions.length - 1) {
-  //         goToNextQuestion();
-  //       }
-        
-  //       maintainTextareaFocus();
-  //     } catch (error: any) {
-  //       console.error('Failed to submit answer:', error);
-  //       setError(error.message || 'Failed to submit answer. Please try again.');
-  //     } finally {
-  //       setIsSavingAnswer(false);
-  //     }
-  //   };
-
-  //   // Save answer without moving to next question
-  //   const handleSaveAnswer = () => {
-  //     console.log("Hitting")
-  //     handleAnswerSubmit(false);
-  //   };
-
-  //   // Submit answer and move to next question
-  //   const handleNextQuestion = () => {
-  //     console.log("next")
-  //     handleAnswerSubmit(true);
-  //   };
-
-  //   // Complete round function - now moves to evaluation
-  //   const handleCompleteRound = async () => {
-  //     if (!currentInterview || !currentRound) return;
-      
-  //     try {
-  //       clearError();
-  //       const token = getToken();
-        
-  //       // Save current answer if there is one
-  //       if (currentAnswer.trim()) {
-  //         await handleSaveAnswer();
-  //       }
-
-  //       // Move to next round or complete interview
-  //       if (currentRoundIndex < currentInterview.rounds.length - 1) {
-  //         setCurrentRound(currentRoundIndex + 1);
-  //         setCurrentAnswer('');
-  //       } else {
-  //         // Complete all rounds - now move to evaluation phase
-          
-  //         // Stop media streams
-  //         if (mediaStreamRef.current) {
-  //           mediaStreamRef.current.getTracks().forEach(track => track.stop());
-  //           mediaStreamRef.current = null;
-  //         }
-  //         if (videoFrameIntervalRef.current) {
-  //           clearInterval(videoFrameIntervalRef.current);
-  //           videoFrameIntervalRef.current = null;
-  //         }
-          
-  //         setStep('evaluation');
-  //       }
-  //     } catch (error: any) {
-  //       console.error('Failed to complete round:', error);
-  //       setError(error.message || 'Failed to complete round. Please try again.');
-  //     }
-  //   };
-
-  //   const handleRoundNavigation = (roundIndex: number) => {
-  //     try {
-  //       setCurrentRound(roundIndex);
-  //       setCurrentAnswer('');
-  //       clearError();
-  //     } catch (error) {
-  //       console.error('Failed to navigate to round:', error);
-  //     }
-  //   };
-
-  //   if (loading && !currentInterview) {
-  //     return (
-  //       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-  //         <div className="text-center">
-  //           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-  //           <p className="text-gray-600">Starting your interview...</p>
-  //         </div>
-  //       </div>
-  //     );
-  //   }
-
-  //   if (error) {
-  //     return (
-  //       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-  //         <div className="text-center bg-white p-8 rounded-2xl shadow-sm max-w-md">
-  //           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-  //           <h2 className="text-xl font-bold text-gray-900 mb-2">Interview Error</h2>
-  //           <p className="text-red-600 mb-4">{error}</p>
-  //           <div className="space-y-2">
-  //             <button
-  //               onClick={() => {
-  //                 clearError();
-  //                 if (mode) {
-  //                   startInterviewSession();
-  //                 }
-  //               }}
-  //               className="w-full bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
-  //             >
-  //               Try Again
-  //             </button>
-  //             <button
-  //               onClick={() => {
-  //                 resetInterview();
-  //                 setStep('setup');
-  //                 setMode(null);
-  //                 clearError();
-  //               }}
-  //               className="w-full bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600"
-  //             >
-  //               Start Over
-  //             </button>
-  //           </div>
-  //         </div>
-  //       </div>
-  //     );
-  //   }
-
-  //   if (!currentInterview || !currentRound) {
-  //     return (
-  //       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-  //         <div className="text-center">
-  //           <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-  //           <p className="text-gray-600">Loading interview data...</p>
-  //         </div>
-  //       </div>
-  //     );
-  //   }
-
-  //   return (
-  //     <div className="min-h-screen bg-gray-50">
-  //       {/* Header */}
-  //       <div className="bg-white shadow-sm px-4 py-4">
-  //         <div className="max-w-6xl mx-auto">
-  //           {/* Top row */}
-  //           <div className="flex items-center justify-between mb-4">
-  //             <div className="flex items-center space-x-4">
-  //               <div className="flex items-center space-x-2">
-  //                 <Clock className="w-5 h-5 text-blue-500" />
-  //                 <span className="font-mono text-lg">{getFormattedTime()}</span>
-  //               </div>
-  //               <div className="text-sm text-gray-600">
-  //                 Round {currentRoundIndex + 1} of {currentInterview.totalRounds}
-  //               </div>
-  //             </div>
-              
-  //             <div className="flex items-center space-x-4">
-  //               <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">
-  //                 Progress: {Math.round(progress)}%
-  //               </div>
-  //               {(isSavingAnswer || isSubmitting) && (
-  //                 <div className="flex items-center space-x-2 text-sm text-blue-600">
-  //                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-  //                   <span>Saving...</span>
-  //                 </div>
-  //               )}
-  //             </div>
-  //           </div>
-
-  //           {/* Rounds navigation */}
-  //           <div className="flex space-x-2 overflow-x-auto pb-2">
-  //             {currentInterview.rounds.map((round, index) => (
-  //               <button
-  //                 key={index}
-  //                 onClick={() => handleRoundNavigation(index)}
-  //                 className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-  //                   index === currentRoundIndex
-  //                     ? 'bg-blue-500 text-white'
-  //                     : index < currentRoundIndex
-  //                     ? 'bg-green-100 text-green-700 hover:bg-green-200'
-  //                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-  //                 }`}
-  //               >
-  //                 {round.name}
-  //                 {index < currentRoundIndex && <CheckCircle className="w-4 h-4 ml-1 inline" />}
-  //               </button>
-  //             ))}
-  //           </div>
-  //         </div>
-  //       </div>
-
-  //       <div className="max-w-6xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-  //         {/* Video/Voice Section */}
-  //         <div className="lg:col-span-1">
-  //           <div className="bg-white rounded-2xl p-6 shadow-sm">
-  //             <div className="text-center mb-4">
-  //               <h3 className="font-semibold text-gray-900">
-  //                 {mode === 'video' ? 'Video Interview' : 'Voice Interview'}
-  //               </h3>
-  //               <p className="text-sm text-gray-600">{currentRound.name}</p>
-  //             </div>
-              
-  //             {mode === 'video' ? (
-  //               <div className="relative">
-  //                 <video
-  //                   ref={videoRef}
-  //                   autoPlay
-  //                   muted
-  //                   className="w-full h-64 bg-gray-200 rounded-lg object-cover"
-  //                 />
-  //                 <canvas
-  //                   ref={canvasRef}
-  //                   className="absolute top-0 left-0 w-full h-64 rounded-lg pointer-events-none"
-  //                   style={{ opacity: 0.8 }}
-  //                 />
-                  
-  //                 {/* Face Detection Status */}
-  //                 <div className="absolute top-3 left-3 space-y-1">
-  //                   <div className="bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs flex items-center space-x-1">
-  //                     <div className={`w-2 h-2 rounded-full ${currentFaceData.faceDetected ? 'bg-green-400' : 'bg-red-400'}`}></div>
-  //                     <span>Recording</span>
-  //                   </div>
-                    
-  //                   {faceApiLoading && (
-  //                     <div className="bg-blue-500 bg-opacity-90 text-white px-2 py-1 rounded text-xs flex items-center space-x-1">
-  //                       <div className="animate-spin w-3 h-3 border border-white border-t-transparent rounded-full"></div>
-  //                       <span>Loading AI...</span>
-  //                     </div>
-  //                   )}
-                    
-  //                   {!faceApiLoaded && !faceApiLoading && (
-  //                     <div className="bg-yellow-500 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
-  //                       Basic Video Mode
-  //                     </div>
-  //                   )}
-                    
-  //                   {faceApiLoaded && currentFaceData.faceDetected && (
-  //                     <div className="bg-green-500 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
-  //                       AI Active ({currentFaceData.numFaces})
-  //                     </div>
-  //                   )}
-                    
-  //                   {faceApiLoaded && !currentFaceData.faceDetected && (
-  //                     <div className="bg-orange-500 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
-  //                       No Face Detected
-  //                     </div>
-  //                   )}
-  //                 </div>
-
-  //                 {/* Eye Contact Indicator */}
-  //                 <div className="absolute top-3 right-3">
-  //                   <div className={`p-1 rounded-full ${currentFaceData.eyeContact ? 'bg-green-500' : 'bg-gray-500'} bg-opacity-70`}>
-  //                     {currentFaceData.eyeContact ? 
-  //                       <Eye className="w-4 h-4 text-white" /> : 
-  //                       <EyeOff className="w-4 h-4 text-white" />
-  //                     }
-  //                   </div>
-  //                 </div>
-
-  //                 {/* Emotion Indicators */}
-  //                 {currentFaceData.faceDetected && (
-  //                   <div className="absolute bottom-3 left-3 right-3">
-  //                     <div className="bg-black bg-opacity-60 rounded p-2">
-  //                       <div className="text-xs text-white mb-1">Live Emotions:</div>
-  //                       <div className="grid grid-cols-4 gap-1 text-xs">
-  //                         {Object.entries(currentFaceData.emotions).map(([emotion, value]) => (
-  //                           <div key={emotion} className="text-center">
-  //                             <div className="text-white capitalize">{emotion.slice(0, 4)}</div>
-  //                             <div className="bg-gray-700 h-1 rounded">
-  //                               <div 
-  //                                 className="bg-blue-400 h-1 rounded transition-all duration-300"
-  //                                 style={{ width: `${(value * 100)}%` }}
-  //                               ></div>
-  //                             </div>
-  //                           </div>
-  //                         ))}
-  //                       </div>
-  //                     </div>
-  //                   </div>
-  //                 )}
-  //               </div>
-  //             ) : (
-  //               <div className="h-64 bg-gradient-to-br from-blue-500 to-green-600 rounded-lg flex items-center justify-center">
-  //                 <div className="text-center text-white">
-  //                   <MicIcon className="w-16 h-16 mx-auto mb-4" />
-  //                   <p className="text-lg font-semibold">Voice Mode Active</p>
-  //                   <p className="text-blue-100">Speak your answers clearly</p>
-  //                 </div>
-  //               </div>
-  //             )}
-
-  //             <div className="mt-4">
-  //               <div className="bg-gray-50 rounded-lg p-3">
-  //                 <h4 className="font-medium text-gray-900 mb-2">{currentRound.name}</h4>
-  //                 <p className="text-sm text-gray-600 mb-2">{currentRound.description}</p>
-  //                 <div className="flex items-center space-x-4 text-xs text-gray-500 mb-3">
-  //                   <span>Duration: {currentRound.duration} min</span>
-  //                   <span>Questions: {currentRound.questions.length}</span>
-  //                 </div>
-                  
-  //                 {/* Real-time Analysis for Video Mode */}
-  //                 {mode === 'video' && (
-  //                   <div className="border-t pt-2 mt-2">
-  //                     <h5 className="text-xs font-medium text-gray-700 mb-2">Real-time Analysis</h5>
-  //                     <div className="space-y-1 text-xs">
-  //                       {faceApiLoading ? (
-  //                         <div className="flex items-center space-x-2 text-blue-600">
-  //                           <div className="animate-spin w-3 h-3 border border-blue-600 border-t-transparent rounded-full"></div>
-  //                           <span>Loading AI models...</span>
-  //                         </div>
-  //                       ) : faceApiLoaded ? (
-  //                         <>
-  //                           <div className="flex justify-between">
-  //                             <span>Face Detection:</span>
-  //                             <span className={currentFaceData.faceDetected ? 'text-green-600' : 'text-red-600'}>
-  //                               {currentFaceData.faceDetected ? '✓ Active' : '✗ No Face'}
-  //                             </span>
-  //                           </div>
-  //                           <div className="flex justify-between">
-  //                             <span>Eye Contact:</span>
-  //                             <span className={currentFaceData.eyeContact ? 'text-green-600' : 'text-yellow-600'}>
-  //                               {currentFaceData.eyeContact ? '✓ Good' : '⚠ Look at Camera'}
-  //                             </span>
-  //                           </div>
-  //                           <div className="flex justify-between">
-  //                             <span>Primary Emotion:</span>
-  //                             <span className="text-blue-600">
-  //                               {(() => {
-  //                                 const maxEmotion = Object.entries(currentFaceData.emotions)
-  //                                   .reduce((max, [emotion, value]) => 
-  //                                     value > max.value ? { emotion, value } : max, 
-  //                                     { emotion: 'neutral', value: 0 }
-  //                                   );
-  //                                 return maxEmotion.emotion.charAt(0).toUpperCase() + maxEmotion.emotion.slice(1);
-  //                               })()}
-  //                             </span>
-  //                           </div>
-  //                         </>
-  //                       ) : (
-  //                         <div className="text-gray-500">
-  //                           <div>✓ Video Recording Active</div>
-  //                           <div>⚠ AI Analysis Unavailable</div>
-  //                           <div className="text-xs mt-1 text-gray-400">
-  //                             Interview will continue normally
-  //                           </div>
-  //                         </div>
-  //                       )}
-  //                     </div>
-  //                   </div>
-  //                 )}
-  //               </div>
-  //             </div>
-  //           </div>
-  //         </div>
-
-  //         {/* Question and Answer Section */}
-  //         <div className="lg:col-span-2">
-  //           <div className="bg-white rounded-2xl p-6 shadow-sm">
-  //             {currentQuestion && (
-  //               <>
-  //                 <div className="mb-6">
-  //                   <div className="flex items-start space-x-3 mb-4">
-  //                     <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-  //                       Q{currentQuestionIndex + 1}/{currentRound.questions.length}
-  //                     </div>
-  //                     <h2 className="text-lg font-semibold text-gray-900 flex-1">
-  //                       {currentQuestion.question}
-  //                     </h2>
-  //                   </div>
-  //                 </div>
-
-  //                 <div className="mb-6">
-  //                   <div className="flex items-center justify-between mb-3">
-  //                     <label className="block text-sm font-medium text-gray-700">
-  //                       Your Answer
-  //                     </label>
-  //                     {speechSupported && (
-  //                       <div className="flex items-center space-x-2">
-  //                         <button
-  //                           onClick={isListening ? stopListening : startListening}
-  //                           className={`p-2 rounded-lg transition-colors ${
-  //                             isListening
-  //                               ? 'bg-red-500 text-white hover:bg-red-600'
-  //                               : 'bg-blue-500 text-white hover:bg-blue-600'
-  //                           }`}
-  //                           title={isListening ? 'Stop Voice Input' : 'Start Voice Input'}
-  //                         >
-  //                           {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-  //                         </button>
-  //                         <span className="text-sm text-gray-500">
-  //                           {isListening ? 'Listening...' : 'Voice Input'}
-  //                         </span>
-  //                         <button onClick={() => startTheCalls()}>Text To Speach</button>
-  //                       </div>
-  //                     )}
-  //                   </div>
-  //                   <textarea
-  //                     ref={textareaRef}
-  //                     value={currentAnswer}
-  //                     onChange={handleTextareaChange}
-  //                     onFocus={maintainTextareaFocus}
-  //                     placeholder="Type your answer here or use voice input..."
-  //                     className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-  //                     autoFocus
-  //                   />
-  //                   {isListening && (
-  //                     <p className="text-sm text-blue-600 mt-2">🎤 Listening... Speak clearly into your microphone</p>
-  //                   )}
-  //                 </div>
-
-  //                 <div className="flex items-center justify-between">
-  //                   <div className="flex space-x-3">
-  //                     <button
-  //                       onClick={goToPreviousQuestion}
-  //                       disabled={currentQuestionIndex === 0}
-  //                       className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-  //                     >
-  //                       Previous
-  //                     </button>
-                      
-  //                     {currentQuestionIndex < currentRound.questions.length - 1 ? (
-  //                       <button
-  //                         onClick={handleAnswerSubmit}
-  //                         disabled={!currentAnswer.trim()}
-  //                         className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center space-x-2"
-  //                       >
-  //                         <span>Next Question</span>
-  //                         <ArrowRight className="w-4 h-4" />
-  //                       </button>
-  //                     ) : (
-  //                       <button
-  //                         onClick={handleAnswerSubmit}
-  //                         disabled={!currentAnswer.trim()}
-  //                         className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
-  //                       >
-  //                         Save Answer
-  //                       </button>
-  //                     )}
-  //                   </div>
-
-  //                   {currentQuestionIndex === currentRound.questions.length - 1 && (
-  //                     <button
-  //                       onClick={handleCompleteRound}
-  //                       className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center space-x-2"
-  //                     >
-  //                       <CheckCircle className="w-4 h-4" />
-  //                       <span>
-  //                         {currentRoundIndex === currentInterview.rounds.length - 1 
-  //                           ? 'Complete Interview' 
-  //                           : 'Complete Round'
-  //                         }
-  //                       </span>
-  //                     </button>
-  //                   )}
-  //                 </div>
-  //               </>
-  //             )}
-  //           </div>
-  //         </div>
-  //       </div>
-  //     </div>
-  //   );
-  // };
-
-
-  // Remove ALL old face detection code from here
-const InterviewPhase = () => {
-  console.log("InterviewPhase started"); // This runs ONLY ONCE now!
-
-  // Face detection hook
-  const { 
-    currentFaceData, 
-    startFaceDetection, 
-    stopFaceDetection 
-  } = useFaceDetection({
-    videoRef,
-    canvasRef,
-    currentInterviewId: currentInterview?._id,
-    addVideoFrame,
-    faceApiLoaded
-  });
-
-  useEffect(() => {
-    if (mode === 'video' && !videoInitializedRef.current) {
-      videoInitializedRef.current = true;
-      
-      initializeVideoStream(
-        videoRef, 
-        mediaStreamRef, 
-        startFaceDetection,  // Use hook's function
-        faceApiLoaded
-      ).catch(err => {
-        console.error("Video init failed:", err);
-        setError(err.message);
-      });
-
-      // Cleanup
-      return () => {
-        stopFaceDetection(); // Use hook's cleanup
-        if (mediaStreamRef.current) {
-          mediaStreamRef.current.getTracks().forEach(track => track.stop());
-          mediaStreamRef.current = null;
-        }
-        if (videoFrameIntervalRef.current) {
-          clearInterval(videoFrameIntervalRef.current);
-          videoFrameIntervalRef.current = null;
-        }
-        videoInitializedRef.current = false;
-      };
-    }
-  }, [mode, startFaceDetection, stopFaceDetection, faceApiLoaded]);
-
-  // ... ALL OTHER EXISTING CODE REMAINS THE SAME ...
-
-  const currentRound = getCurrentRound();
-  const currentQuestion = getCurrentQuestion();
-  const progress = getProgress();
-  
-  const handleAnswerSubmit = async (isNextQuestion = true) => {
-    if (!currentAnswer.trim() || !currentInterview) return;
-
-    setIsSavingAnswer(true);
-    try {
-      const token = getToken();
-      
-      const response = await submitSingleAnswer(
-        currentInterview._id, 
-        currentRoundIndex, 
-        currentQuestionIndex, 
-        currentAnswer.trim(), 
-        token
-      );
-
-      console.log('Answer submitted successfully:', response);
-      
-      updateInterviewAnswer(currentRoundIndex, currentQuestionIndex, currentAnswer.trim());
-      setCurrentAnswer('');
-      
-      if (isNextQuestion && currentRound && currentQuestionIndex < currentRound.questions.length - 1) {
-        goToNextQuestion();
+        // Cleanup on unmount
+        return () => {
+          if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach(track => track.stop());
+            mediaStreamRef.current = null;
+          }
+          videoInitializedRef.current = false;
+        };
       }
-      
-      maintainTextareaFocus();
-    } catch (error: any) {
-      console.error('Failed to submit answer:', error);
-      setError(error.message || 'Failed to submit answer. Please try again.');
-    } finally {
-      setIsSavingAnswer(false);
-    }
-  };
-
-  const handleSaveAnswer = () => {
-    console.log("Hitting");
-    handleAnswerSubmit(false);
-  };
-
-  const handleNextQuestion = () => {
-    console.log("next");
-    handleAnswerSubmit(true);
-  };
-
-  const handleCompleteRound = async () => {
-    if (!currentInterview || !currentRound) return;
+    }, [mode]);
     
-    try {
-      clearError();
-      const token = getToken();
-      
-      if (currentAnswer.trim()) {
-        await handleSaveAnswer();
-      }
 
-      if (currentRoundIndex < currentInterview.rounds.length - 1) {
-        setCurrentRound(currentRoundIndex + 1);
+    const currentRound = getCurrentRound();
+    const currentQuestion = getCurrentQuestion();
+    const progress = getProgress();
+    
+    // Real API answer submission function
+    const handleAnswerSubmit = async (isNextQuestion = true) => {
+      if (!currentAnswer.trim() || !currentInterview) return;
+
+      setIsSavingAnswer(true);
+      try {
+        const token = getToken();
+        
+        // Submit single answer to real API
+        const response = await submitSingleAnswer(
+          currentInterview._id, 
+          currentRoundIndex, 
+          currentQuestionIndex, 
+          currentAnswer.trim(), 
+          token
+        );
+
+        console.log('Answer submitted successfully:', response);
+        
+        // Update local state
+        updateInterviewAnswer(currentRoundIndex, currentQuestionIndex, currentAnswer.trim());
         setCurrentAnswer('');
-      } else {
-        // Complete interview - move to evaluation
-        stopFaceDetection(); // STOP face detection
-        if (mediaStreamRef.current) {
-          mediaStreamRef.current.getTracks().forEach(track => track.stop());
-          mediaStreamRef.current = null;
-        }
-        if (videoFrameIntervalRef.current) {
-          clearInterval(videoFrameIntervalRef.current);
-          videoFrameIntervalRef.current = null;
+        
+        // Auto move to next question if requested
+        if (isNextQuestion && currentRound && currentQuestionIndex < currentRound.questions.length - 1) {
+          goToNextQuestion();
         }
         
-        setStep('evaluation');
+        maintainTextareaFocus();
+      } catch (error: any) {
+        console.error('Failed to submit answer:', error);
+        setError(error.message || 'Failed to submit answer. Please try again.');
+      } finally {
+        setIsSavingAnswer(false);
       }
-    } catch (error: any) {
-      console.error('Failed to complete round:', error);
-      setError(error.message || 'Failed to complete round. Please try again.');
-    }
-  };
+    };
 
-  const handleRoundNavigation = (roundIndex: number) => {
-    try {
-      setCurrentRound(roundIndex);
-      setCurrentAnswer('');
-      clearError();
-    } catch (error) {
-      console.error('Failed to navigate to round:', error);
-    }
-  };
+    // Save answer without moving to next question
+    const handleSaveAnswer = () => {
+      console.log("Hitting")
+      handleAnswerSubmit(false);
+    };
 
-  // ... ALL LOADING/ERROR HANDLING REMAINS THE SAME ...
+    // Submit answer and move to next question
+    const handleNextQuestion = () => {
+      console.log("next")
+      handleAnswerSubmit(true);
+    };
 
-  if (loading && !currentInterview) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Starting your interview...</p>
-        </div>
-      </div>
-    );
-  }
+    // Complete round function - now moves to evaluation
+    const handleCompleteRound = async () => {
+      if (!currentInterview || !currentRound) return;
+      
+      try {
+        clearError();
+        const token = getToken();
+        
+        // Save current answer if there is one
+        if (currentAnswer.trim()) {
+          await handleSaveAnswer();
+        }
 
-  // ... ALL OTHER JSX REMAINS EXACTLY THE SAME ...
-  // Just replace currentFaceData references - they work identically!
+        // Move to next round or complete interview
+        if (currentRoundIndex < currentInterview.rounds.length - 1) {
+          setCurrentRound(currentRoundIndex + 1);
+          setCurrentAnswer('');
+        } else {
+          // Complete all rounds - now move to evaluation phase
+          
+          // Stop media streams
+          if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach(track => track.stop());
+            mediaStreamRef.current = null;
+          }
+          if (videoFrameIntervalRef.current) {
+            clearInterval(videoFrameIntervalRef.current);
+            videoFrameIntervalRef.current = null;
+          }
+          
+          setStep('evaluation');
+        }
+      } catch (error: any) {
+        console.error('Failed to complete round:', error);
+        setError(error.message || 'Failed to complete round. Please try again.');
+      }
+    };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm px-4 py-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Clock className="w-5 h-5 text-blue-500" />
-                <span className="font-mono text-lg">{getFormattedTime()}</span>
-              </div>
-              <div className="text-sm text-gray-600">
-                Round {currentRoundIndex + 1} of {currentInterview.totalRounds}
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">
-                Progress: {Math.round(progress)}%
-              </div>
-              {(isSavingAnswer || isSubmitting) && (
-                <div className="flex items-center space-x-2 text-sm text-blue-600">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                  <span>Saving...</span>
-                </div>
-              )}
-            </div>
+    const handleRoundNavigation = (roundIndex: number) => {
+      try {
+        setCurrentRound(roundIndex);
+        setCurrentAnswer('');
+        clearError();
+      } catch (error) {
+        console.error('Failed to navigate to round:', error);
+      }
+    };
+
+    if (loading && !currentInterview) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-600">Starting your interview...</p>
           </div>
+        </div>
+      );
+    }
 
-          <div className="flex space-x-2 overflow-x-auto pb-2">
-            {currentInterview.rounds.map((round, index) => (
+    if (error) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center bg-white p-8 rounded-2xl shadow-sm max-w-md">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Interview Error</h2>
+            <p className="text-red-600 mb-4">{error}</p>
+            <div className="space-y-2">
               <button
-                key={index}
-                onClick={() => handleRoundNavigation(index)}
-                className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  index === currentRoundIndex
-                    ? 'bg-blue-500 text-white'
-                    : index < currentRoundIndex
-                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                onClick={() => {
+                  clearError();
+                  if (mode) {
+                    startInterviewSession();
+                  }
+                }}
+                className="w-full bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
               >
-                {round.name}
-                {index < currentRoundIndex && <CheckCircle className="w-4 h-4 ml-1 inline" />}
+                Try Again
               </button>
-            ))}
+              <button
+                onClick={() => {
+                  resetInterview();
+                  setStep('setup');
+                  setMode(null);
+                  clearError();
+                }}
+                className="w-full bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600"
+              >
+                Start Over
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      );
+    }
 
-      <div className="max-w-6xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Video Section - SAME JSX */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <div className="text-center mb-4">
-              <h3 className="font-semibold text-gray-900">
-                {mode === 'video' ? 'Video Interview' : 'Voice Interview'}
-              </h3>
-              <p className="text-sm text-gray-600">{currentRound.name}</p>
-            </div>
-            
-            {mode === 'video' ? (
-              <div className="relative">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  muted
-                  className="w-full h-64 bg-gray-200 rounded-lg object-cover"
-                />
-                <canvas
-                  ref={canvasRef}
-                  className="absolute top-0 left-0 w-full h-64 rounded-lg pointer-events-none"
-                  style={{ opacity: 0.8 }}
-                />
-                
-                {/* ALL STATUS INDICATORS - SAME JSX */}
-                <div className="absolute top-3 left-3 space-y-1">
-                  <div className="bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs flex items-center space-x-1">
-                    <div className={`w-2 h-2 rounded-full ${currentFaceData.faceDetected ? 'bg-green-400' : 'bg-red-400'}`}></div>
-                    <span>Recording</span>
-                  </div>
-                  
-                  {faceApiLoading && (
-                    <div className="bg-blue-500 bg-opacity-90 text-white px-2 py-1 rounded text-xs flex items-center space-x-1">
-                      <div className="animate-spin w-3 h-3 border border-white border-t-transparent rounded-full"></div>
-                      <span>Loading AI...</span>
-                    </div>
-                  )}
-                  
-                  {!faceApiLoaded && !faceApiLoading && (
-                    <div className="bg-yellow-500 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
-                      Basic Video Mode
-                    </div>
-                  )}
-                  
-                  {faceApiLoaded && currentFaceData.faceDetected && (
-                    <div className="bg-green-500 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
-                      AI Active ({currentFaceData.numFaces})
-                    </div>
-                  )}
-                  
-                  {faceApiLoaded && !currentFaceData.faceDetected && (
-                    <div className="bg-orange-500 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
-                      No Face Detected
-                    </div>
-                  )}
+    if (!currentInterview || !currentRound) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+            <p className="text-gray-600">Loading interview data...</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <div className="bg-white shadow-sm px-4 py-4">
+          <div className="max-w-6xl mx-auto">
+            {/* Top row */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <Clock className="w-5 h-5 text-blue-500" />
+                  <span className="font-mono text-lg">{getFormattedTime()}</span>
                 </div>
-
-                <div className="absolute top-3 right-3">
-                  <div className={`p-1 rounded-full ${currentFaceData.eyeContact ? 'bg-green-500' : 'bg-gray-500'} bg-opacity-70`}>
-                    {currentFaceData.eyeContact ? 
-                      <Eye className="w-4 h-4 text-white" /> : 
-                      <EyeOff className="w-4 h-4 text-white" />
-                    }
-                  </div>
+                <div className="text-sm text-gray-600">
+                  Round {currentRoundIndex + 1} of {currentInterview.totalRounds}
                 </div>
-
-                {currentFaceData.faceDetected && (
-                  <div className="absolute bottom-3 left-3 right-3">
-                    <div className="bg-black bg-opacity-60 rounded p-2">
-                      <div className="text-xs text-white mb-1">Live Emotions:</div>
-                      <div className="grid grid-cols-4 gap-1 text-xs">
-                        {Object.entries(currentFaceData.emotions).map(([emotion, value]) => (
-                          <div key={emotion} className="text-center">
-                            <div className="text-white capitalize">{emotion.slice(0, 4)}</div>
-                            <div className="bg-gray-700 h-1 rounded">
-                              <div 
-                                className="bg-blue-400 h-1 rounded transition-all duration-300"
-                                style={{ width: `${(value * 100)}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">
+                  Progress: {Math.round(progress)}%
+                </div>
+                {(isSavingAnswer || isSubmitting) && (
+                  <div className="flex items-center space-x-2 text-sm text-blue-600">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                    <span>Saving...</span>
                   </div>
                 )}
               </div>
-            ) : (
-              // Voice mode JSX - SAME
-              <div className="h-64 bg-gradient-to-br from-blue-500 to-green-600 rounded-lg flex items-center justify-center">
-                <div className="text-center text-white">
-                  <MicIcon className="w-16 h-16 mx-auto mb-4" />
-                  <p className="text-lg font-semibold">Voice Mode Active</p>
-                  <p className="text-blue-100">Speak your answers clearly</p>
+            </div>
+
+            {/* Rounds navigation */}
+            <div className="flex space-x-2 overflow-x-auto pb-2">
+              {currentInterview.rounds.map((round, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleRoundNavigation(index)}
+                  className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    index === currentRoundIndex
+                      ? 'bg-blue-500 text-white'
+                      : index < currentRoundIndex
+                      ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {round.name}
+                  {index < currentRoundIndex && <CheckCircle className="w-4 h-4 ml-1 inline" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-6xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Video/Voice Section */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <div className="text-center mb-4">
+                <h3 className="font-semibold text-gray-900">
+                  {mode === 'video' ? 'Video Interview' : 'Voice Interview'}
+                </h3>
+                <p className="text-sm text-gray-600">{currentRound.name}</p>
+              </div>
+              
+              {mode === 'video' ? (
+                <div className="relative">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    className="w-full h-64 bg-gray-200 rounded-lg object-cover"
+                  />
+                  <canvas
+                    ref={canvasRef}
+                    className="absolute top-0 left-0 w-full h-64 rounded-lg pointer-events-none"
+                    style={{ opacity: 0.8 }}
+                  />
+                  
+                  {/* Face Detection Status */}
+                  <div className="absolute top-3 left-3 space-y-1">
+                    <div className="bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs flex items-center space-x-1">
+                      <div className={`w-2 h-2 rounded-full ${currentFaceData.faceDetected ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                      <span>Recording</span>
+                    </div>
+                    
+                    {faceApiLoading && (
+                      <div className="bg-blue-500 bg-opacity-90 text-white px-2 py-1 rounded text-xs flex items-center space-x-1">
+                        <div className="animate-spin w-3 h-3 border border-white border-t-transparent rounded-full"></div>
+                        <span>Loading AI...</span>
+                      </div>
+                    )}
+                    
+                    {!faceApiLoaded && !faceApiLoading && (
+                      <div className="bg-yellow-500 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
+                        Basic Video Mode
+                      </div>
+                    )}
+                    
+                    {faceApiLoaded && currentFaceData.faceDetected && (
+                      <div className="bg-green-500 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
+                        AI Active ({currentFaceData.numFaces})
+                      </div>
+                    )}
+                    
+                    {faceApiLoaded && !currentFaceData.faceDetected && (
+                      <div className="bg-orange-500 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
+                        No Face Detected
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Eye Contact Indicator */}
+                  <div className="absolute top-3 right-3">
+                    <div className={`p-1 rounded-full ${currentFaceData.eyeContact ? 'bg-green-500' : 'bg-gray-500'} bg-opacity-70`}>
+                      {currentFaceData.eyeContact ? 
+                        <Eye className="w-4 h-4 text-white" /> : 
+                        <EyeOff className="w-4 h-4 text-white" />
+                      }
+                    </div>
+                  </div>
+
+                  {/* Emotion Indicators */}
+                  {currentFaceData.faceDetected && (
+                    <div className="absolute bottom-3 left-3 right-3">
+                      <div className="bg-black bg-opacity-60 rounded p-2">
+                        <div className="text-xs text-white mb-1">Live Emotions:</div>
+                        <div className="grid grid-cols-4 gap-1 text-xs">
+                          {Object.entries(currentFaceData.emotions).map(([emotion, value]) => (
+                            <div key={emotion} className="text-center">
+                              <div className="text-white capitalize">{emotion.slice(0, 4)}</div>
+                              <div className="bg-gray-700 h-1 rounded">
+                                <div 
+                                  className="bg-blue-400 h-1 rounded transition-all duration-300"
+                                  style={{ width: `${(value * 100)}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="h-64 bg-gradient-to-br from-blue-500 to-green-600 rounded-lg flex items-center justify-center">
+                  <div className="text-center text-white">
+                    <MicIcon className="w-16 h-16 mx-auto mb-4" />
+                    <p className="text-lg font-semibold">Voice Mode Active</p>
+                    <p className="text-blue-100">Speak your answers clearly</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <h4 className="font-medium text-gray-900 mb-2">{currentRound.name}</h4>
+                  <p className="text-sm text-gray-600 mb-2">{currentRound.description}</p>
+                  <div className="flex items-center space-x-4 text-xs text-gray-500 mb-3">
+                    <span>Duration: {currentRound.duration} min</span>
+                    <span>Questions: {currentRound.questions.length}</span>
+                  </div>
+                  
+                  {/* Real-time Analysis for Video Mode */}
+                  {mode === 'video' && (
+                    <div className="border-t pt-2 mt-2">
+                      <h5 className="text-xs font-medium text-gray-700 mb-2">Real-time Analysis</h5>
+                      <div className="space-y-1 text-xs">
+                        {faceApiLoading ? (
+                          <div className="flex items-center space-x-2 text-blue-600">
+                            <div className="animate-spin w-3 h-3 border border-blue-600 border-t-transparent rounded-full"></div>
+                            <span>Loading AI models...</span>
+                          </div>
+                        ) : faceApiLoaded ? (
+                          <>
+                            <div className="flex justify-between">
+                              <span>Face Detection:</span>
+                              <span className={currentFaceData.faceDetected ? 'text-green-600' : 'text-red-600'}>
+                                {currentFaceData.faceDetected ? '✓ Active' : '✗ No Face'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Eye Contact:</span>
+                              <span className={currentFaceData.eyeContact ? 'text-green-600' : 'text-yellow-600'}>
+                                {currentFaceData.eyeContact ? '✓ Good' : '⚠ Look at Camera'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Primary Emotion:</span>
+                              <span className="text-blue-600">
+                                {(() => {
+                                  const maxEmotion = Object.entries(currentFaceData.emotions)
+                                    .reduce((max, [emotion, value]) => 
+                                      value > max.value ? { emotion, value } : max, 
+                                      { emotion: 'neutral', value: 0 }
+                                    );
+                                  return maxEmotion.emotion.charAt(0).toUpperCase() + maxEmotion.emotion.slice(1);
+                                })()}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-gray-500">
+                            <div>✓ Video Recording Active</div>
+                            <div>⚠ AI Analysis Unavailable</div>
+                            <div className="text-xs mt-1 text-gray-400">
+                              Interview will continue normally
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
+          </div>
 
-            {/* Round info and analysis - SAME JSX */}
-            <div className="mt-4">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-medium text-gray-900 mb-2">{currentRound.name}</h4>
-                <p className="text-sm text-gray-600 mb-2">{currentRound.description}</p>
-                <div className="flex items-center space-x-4 text-xs text-gray-500 mb-3">
-                  <span>Duration: {currentRound.duration} min</span>
-                  <span>Questions: {currentRound.questions.length}</span>
-                </div>
-                
-                {mode === 'video' && (
-                  <div className="border-t pt-2 mt-2">
-                    <h5 className="text-xs font-medium text-gray-700 mb-2">Real-time Analysis</h5>
-                    <div className="space-y-1 text-xs">
-                      {faceApiLoading ? (
-                        <div className="flex items-center space-x-2 text-blue-600">
-                          <div className="animate-spin w-3 h-3 border border-blue-600 border-t-transparent rounded-full"></div>
-                          <span>Loading AI models...</span>
-                        </div>
-                      ) : faceApiLoaded ? (
-                        <>
-                          <div className="flex justify-between">
-                            <span>Face Detection:</span>
-                            <span className={currentFaceData.faceDetected ? 'text-green-600' : 'text-red-600'}>
-                              {currentFaceData.faceDetected ? '✓ Active' : '✗ No Face'}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Eye Contact:</span>
-                            <span className={currentFaceData.eyeContact ? 'text-green-600' : 'text-yellow-600'}>
-                              {currentFaceData.eyeContact ? '✓ Good' : '⚠ Look at Camera'}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Primary Emotion:</span>
-                            <span className="text-blue-600">
-                              {(() => {
-                                const maxEmotion = Object.entries(currentFaceData.emotions)
-                                  .reduce((max, [emotion, value]) => 
-                                    value > max.value ? { emotion, value } : max, 
-                                    { emotion: 'neutral', value: 0 }
-                                  );
-                                return maxEmotion.emotion.charAt(0).toUpperCase() + maxEmotion.emotion.slice(1);
-                              })()}
-                            </span>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="text-gray-500">
-                          <div>✓ Video Recording Active</div>
-                          <div>⚠ AI Analysis Unavailable</div>
+          {/* Question and Answer Section */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              {currentQuestion && (
+                <>
+                  <div className="mb-6">
+                    <div className="flex items-start space-x-3 mb-4">
+                      <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
+                        Q{currentQuestionIndex + 1}/{currentRound.questions.length}
+                      </div>
+                      <h2 className="text-lg font-semibold text-gray-900 flex-1">
+                        {currentQuestion.question}
+                      </h2>
+                    </div>
+                  </div>
+
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Your Answer
+                      </label>
+                      {speechSupported && (
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={isListening ? stopListening : startListening}
+                            className={`p-2 rounded-lg transition-colors ${
+                              isListening
+                                ? 'bg-red-500 text-white hover:bg-red-600'
+                                : 'bg-blue-500 text-white hover:bg-blue-600'
+                            }`}
+                            title={isListening ? 'Stop Voice Input' : 'Start Voice Input'}
+                          >
+                            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                          </button>
+                          <span className="text-sm text-gray-500">
+                            {isListening ? 'Listening...' : 'Voice Input'}
+                          </span>
+                          <button onClick={() => startTheCalls()}>Text To Speach</button>
                         </div>
                       )}
                     </div>
+                    <textarea
+                      ref={textareaRef}
+                      value={currentAnswer}
+                      onChange={handleTextareaChange}
+                      onFocus={maintainTextareaFocus}
+                      placeholder="Type your answer here or use voice input..."
+                      className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      autoFocus
+                    />
+                    {isListening && (
+                      <p className="text-sm text-blue-600 mt-2">🎤 Listening... Speak clearly into your microphone</p>
+                    )}
                   </div>
-                )}
-              </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={goToPreviousQuestion}
+                        disabled={currentQuestionIndex === 0}
+                        className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Previous
+                      </button>
+                      
+                      {currentQuestionIndex < currentRound.questions.length - 1 ? (
+                        <button
+                          onClick={handleAnswerSubmit}
+                          disabled={!currentAnswer.trim()}
+                          className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center space-x-2"
+                        >
+                          <span>Next Question</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleAnswerSubmit}
+                          disabled={!currentAnswer.trim()}
+                          className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                        >
+                          Save Answer
+                        </button>
+                      )}
+                    </div>
+
+                    {currentQuestionIndex === currentRound.questions.length - 1 && (
+                      <button
+                        onClick={handleCompleteRound}
+                        className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center space-x-2"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        <span>
+                          {currentRoundIndex === currentInterview.rounds.length - 1 
+                            ? 'Complete Interview' 
+                            : 'Complete Round'
+                          }
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
-
-        {/* Question and Answer Section - SAME JSX */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            {currentQuestion && (
-              <>
-                <div className="mb-6">
-                  <div className="flex items-start space-x-3 mb-4">
-                    <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-                      Q{currentQuestionIndex + 1}/{currentRound.questions.length}
-                    </div>
-                    <h2 className="text-lg font-semibold text-gray-900 flex-1">
-                      {currentQuestion.question}
-                    </h2>
-                  </div>
-                </div>
-
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="block text-sm font-medium text-gray-700">Your Answer</label>
-                    {speechSupported && (
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={isListening ? stopListening : startListening}
-                          className={`p-2 rounded-lg transition-colors ${
-                            isListening ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-blue-500 text-white hover:bg-blue-600'
-                          }`}
-                        >
-                          {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                        </button>
-                        <span className="text-sm text-gray-500">
-                          {isListening ? 'Listening...' : 'Voice Input'}
-                        </span>
-                        <button onClick={() => startTheCalls()}>Text To Speech</button>
-                      </div>
-                    )}
-                  </div>
-                  <textarea
-                    ref={textareaRef}
-                    value={currentAnswer}
-                    onChange={handleTextareaChange}
-                    onFocus={maintainTextareaFocus}
-                    placeholder="Type your answer here or use voice input..."
-                    className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                    autoFocus
-                  />
-                  {isListening && (
-                    <p className="text-sm text-blue-600 mt-2">🎤 Listening... Speak clearly into your microphone</p>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={goToPreviousQuestion}
-                      disabled={currentQuestionIndex === 0}
-                      className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Previous
-                    </button>
-                    
-                    {currentQuestionIndex < currentRound.questions.length - 1 ? (
-                      <button
-                        onClick={handleAnswerSubmit}
-                        disabled={!currentAnswer.trim()}
-                        className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center space-x-2"
-                      >
-                        <span>Next Question</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleAnswerSubmit}
-                        disabled={!currentAnswer.trim()}
-                        className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
-                      >
-                        Save Answer
-                      </button>
-                    )}
-                  </div>
-
-                  {currentQuestionIndex === currentRound.questions.length - 1 && (
-                    <button
-                      onClick={handleCompleteRound}
-                      className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center space-x-2"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                      <span>
-                        {currentRoundIndex === currentInterview.rounds.length - 1 
-                          ? 'Complete Interview' 
-                          : 'Complete Round'
-                        }
-                      </span>
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   // NEW: Evaluation Phase Component
   const EvaluationPhase = () => {

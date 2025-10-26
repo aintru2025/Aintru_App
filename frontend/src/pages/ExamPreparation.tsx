@@ -324,6 +324,7 @@ const ExamPreparation: React.FC<ExamPreparationProps> = ({ onBack }) => {
     try {
       // Initialize media based on mode
       if (mode === 'video') {
+        console.log("initialising video ))))))")
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: true, 
           audio: true 
