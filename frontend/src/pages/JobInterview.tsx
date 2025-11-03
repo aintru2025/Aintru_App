@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import type { VideoFrameData, Round, InterviewSession } from '../stores/exam';
 import { useFaceDetection, type FaceData } from '../config/userFaceDetection';
+import { Editor } from '@monaco-editor/react';
 
 // Face-api.js types
 declare global {
@@ -26,6 +27,7 @@ interface JobInterviewProps {
 
 const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
   const { isAuthenticated, getToken } = useAuthStore();
+
   const navigate = useNavigate();
   
   // Interview Store
@@ -84,6 +86,8 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [speaking, setSpeaking] = useState(false)
+  const [selectedOption, setSelectedOption] = useState("");
+  const [code, setCode] = useState("// Start typing your code...");
   
   // Face API States
   const [faceApiLoaded, setFaceApiLoaded] = useState(false);
@@ -113,6 +117,18 @@ const JobInterview: React.FC<JobInterviewProps> = ({ onBack }) => {
   const faceDetectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  // Update the state whenever code changes
+  // const handleEditorChange = (value: string | undefined) => {
+  //   setCode(value || "");
+  // };
+
+  const codeRef = useRef("// Start typing...");
+
+  const handleEditorChange = (value: string | undefined) => {
+    codeRef.current = value || "";
+  };
+
 
   // Load Face-api.js models
   const loadFaceApiModels = async () => {
@@ -1683,7 +1699,8 @@ const InterviewPhase = () => {
         currentRoundIndex, 
         currentQuestionIndex, 
         currentAnswer.trim(), 
-        token
+        token,
+        codeRef.current
       );
 
       console.log('Answer submitted successfully:', response);
@@ -2064,6 +2081,18 @@ const InterviewPhase = () => {
                     )}
                   </div>
 
+                              {/* Monaco Code Editor Installed here */}
+            <div className="p-4">
+              <select
+                onChange={(e) => setSelectedOption(e.target.value)}
+                className="border px-3 py-2 rounded"
+            >
+              <option value="">Select Option</option>
+              <option value="show">Show Editor</option>
+              <option value="hide">Hide Editor</option>
+            </select>
+            </div>
+
                   {currentQuestionIndex === currentRound.questions.length - 1 && (
                     <button
                       onClick={handleCompleteRound}
@@ -2082,8 +2111,23 @@ const InterviewPhase = () => {
               </>
             )}
           </div>
-        </div>
-      </div>
+
+
+      {/* Monaco edtiro part-2 */}
+      {selectedOption === "show" && (
+                <div className="mt-4 border rounded-lg shadow">
+                  <Editor
+                    height="300px"
+                    defaultLanguage="javascript"
+                    // defaultValue="// Write some code here..."
+                    theme="vs-dark"
+                    defaultValue={codeRef.current}
+                    onChange={handleEditorChange}
+                  />
+              </div>
+              )}
+                      </div>
+                    </div>
     </div>
   );
 };

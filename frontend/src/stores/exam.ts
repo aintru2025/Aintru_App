@@ -237,7 +237,7 @@ export interface ExamStoreState {
   generateInterviewSummary: (sessionId: string, authToken?: string) => Promise<InterviewSession>;
   
   // Interview answer submission methods
-  submitSingleAnswer: (sessionId: string, roundIndex: number, questionIndex: number, answer: string, authToken?: string) => Promise<SingleAnswerResponse>;
+  submitSingleAnswer: (sessionId: string, roundIndex: number, questionIndex: number, answer: string, authToken?: string, code?: string) => Promise<SingleAnswerResponse>;
   submitMultipleAnswers: (sessionId: string, answers: Array<{ roundIndex: number; questionIndex: number; answer: string }>, authToken?: string) => Promise<MultipleAnswersResponse>;
   updateInterviewAnswer: (roundIndex: number, questionIndex: number, answer: string) => void;
   

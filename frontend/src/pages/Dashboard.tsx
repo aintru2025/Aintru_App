@@ -23,13 +23,25 @@ const Dashboard = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
+  const [mockInterviews, SetMockInterviews] = useState(0)
+  const [practiseSessions, setPractiseSessions] = useState(0)
+  const [successRate, SetSuccessRate] = useState(0)
+  const [totalTime, SetTotalTime] = useState(0)
+
   // Mock data for stats
-  const stats = {
+  const stat = {
     mockInterviews: 0,
     practiceSessions: 0,
     successRate: 0,
     totalTime: 0
   };
+
+  const stats = {
+    mockInterviews: mockInterviews,
+    practiceSessions: practiseSessions,
+    successRate: successRate,
+    totalTime: totalTime,
+  }
 
   // Mock performance data for the graph
   const performanceData = [
@@ -45,6 +57,10 @@ const Dashboard = () => {
 
   const maxScore = Math.max(...performanceData.map(d => d.score));
   const minScore = Math.min(...performanceData.map(d => d.score));
+
+  useEffect(() => {
+    
+  }, [])
 
     return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 relative overflow-hidden">
