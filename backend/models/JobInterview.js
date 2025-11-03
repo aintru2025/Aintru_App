@@ -19,6 +19,11 @@ const QuestionSchema = new mongoose.Schema(
     score: { type: Number, default: null },
     feedback: { type: String, default: "" },
     crossQuestions: [CrossQuestionSchema],
+    isCodingQuestion: { type: Boolean, default: false },
+    code: {
+      language: { type: String },
+      content: { type: String },
+    },
   },
   { timestamps: true }
 );

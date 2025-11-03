@@ -3,7 +3,7 @@ const JobInterview = require("../models/JobInterview");
 
 const getProgress = async (req, res) => {
   try {
-    const { userId } = req.user; 
+    const { userId } = req.user;
 
     const exams = await ExamInterview.find({ userId });
     const jobs = await JobInterview.find({ userId });
@@ -11,7 +11,35 @@ const getProgress = async (req, res) => {
     const totalExams = exams.length;
     const totalJobs = jobs.length;
 
-    // Count monthly progression (last 6 months)
+    // ✅ New: total mock interviews (completed)
+    const totalMockInterviews =
+      exams.filter((e) => e.isCompleted).length +
+      jobs.filter((j) => j.isCompleted).length;
+
+    // ✅ New: total time spent (in hours)
+    const totalTimeMs = [...exams, ...jobs].reduce((acc, item) => {
+      const start = item.startTime || item.createdAt;
+      const end = item.endTime || item.updatedAt || item.createdAt;
+      return acc + (new Date(end) - new Date(start));
+    }, 0);
+    const totalTimeHours = (totalTimeMs / (1000 * 60 * 60)).toFixed(2);
+
+    // ✅ New: success rate (avg score ≥ 7)
+    const completedJobs = jobs.filter((j) => j.isCompleted);
+    const successfulJobs = completedJobs.filter((job) => {
+      const allScores = job.rounds.flatMap((r) =>
+        r.questions.map((q) => q.score || 0)
+      );
+      const avg = allScores.length
+        ? allScores.reduce((a, b) => a + b, 0) / allScores.length
+        : 0;
+      return avg >= 7;
+    });
+    const successRate = completedJobs.length
+      ? ((successfulJobs.length / completedJobs.length) * 100).toFixed(2)
+      : 0;
+
+    // Monthly progression
     const monthlyData = {};
     [...exams, ...jobs].forEach((item) => {
       const month = new Date(item.createdAt).toLocaleString("default", {
@@ -25,6 +53,9 @@ const getProgress = async (req, res) => {
       progress: {
         totalExams,
         totalJobs,
+        totalMockInterviews,
+        totalTimeHours,
+        successRate,
         monthlyData,
       },
     });
@@ -35,7 +66,6 @@ const getProgress = async (req, res) => {
   }
 };
 
-
 const getImprovement = async (req, res) => {
   try {
     const { userId } = req.user;
@@ -45,7 +75,6 @@ const getImprovement = async (req, res) => {
     if (!jobs.length)
       return res.json({ improvement: { trend: [], message: "No data yet" } });
 
-    // Example: average score trend per job
     const trend = jobs.map((job) => {
       const allScores = job.rounds.flatMap((r) =>
         r.questions.map((q) => q.score || 0)
@@ -82,14 +111,12 @@ const getPerformance = async (req, res) => {
         performance: { message: "No interviews completed yet" },
       });
 
-    // Avg score in latest job
     const allScores = latestJob.rounds.flatMap((r) =>
       r.questions.map((q) => q.score || 0)
     );
     const avgScore =
       allScores.reduce((a, b) => a + b, 0) / (allScores.length || 1);
 
-    // Emotion breakdown
     const emotions = latestJob.behavioralMetrics?.avgEmotions || {
       happy: 0,
       sad: 0,

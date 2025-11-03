@@ -40,13 +40,15 @@ async function startJobInterview(req, res) {
 const submitAnswer = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const { roundIndex, questionIndex, answer } = req.body;
+    const { roundIndex, questionIndex, answer, code, language } = req.body;
 
     const session = await jobService.submitAnswer({
       interviewId: sessionId,
       roundIndex,
       questionIndex,
       userAnswer: answer,
+      codeSnippet: code,
+      language,
     });
 
     res.json({ message: "Answer submitted", session });
@@ -56,6 +58,7 @@ const submitAnswer = async (req, res) => {
       .json({ message: "Error submitting answer", error: error.message });
   }
 };
+
 
 
 const submitAllAnswers = async (req, res) => {

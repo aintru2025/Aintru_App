@@ -18,7 +18,11 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
  *  ]
  * }
  */
-async function generateInterviewFlow(company = "Target Company", role = "Software Developer", experience = "Fresher") {
+async function generateInterviewFlow(
+  company = "Target Company",
+  role = "Software Developer",
+  experience = "Fresher"
+) {
   const prompt = `You are asked to design a realistic interview process for hiring a ${role} at ${company}.
 Return a JSON object ONLY (no extra explanation) with the following structure:
 {
@@ -32,20 +36,16 @@ Return a JSON object ONLY (no extra explanation) with the following structure:
       "description": "<short description>",
       "duration": <minutes - integer>,
       "questions": ["question 1", "question 2", ...]
-    },
-    ...
+    }
   ]
 }
-Design between 3 and 6 rounds depending on role. For each round include 3-6 questions appropriate to the round type. Keep JSON values concise. Experience level: ${experience}.`;
+Design between 3 and 6 rounds depending on role. For each round include 3–6 questions appropriate to the round type. Keep JSON concise. Experience level: ${experience}.`;
 
   const result = await model.generateContent(prompt);
   const text = result.response.text();
 
-  // Try to parse JSON from model output robustly
   let jsonText = text.trim();
-  // Trim surrounding markdown or explanation if any (attempt heuristics)
   try {
-    // If model returns backticks or explanation, extract first {...} block
     const firstBrace = jsonText.indexOf("{");
     const lastBrace = jsonText.lastIndexOf("}");
     if (firstBrace >= 0 && lastBrace > firstBrace) {
@@ -54,9 +54,7 @@ Design between 3 and 6 rounds depending on role. For each round include 3-6 ques
     const parsed = JSON.parse(jsonText);
     return parsed;
   } catch (err) {
-    // If parsing fails, fallback to naive extraction: split lines and attempt to build minimal flow
-    console.warn("Failed to parse flow JSON from Gemini; falling back to simple flow. Error:", err.message);
-    // Fallback simple flow
+    console.warn("Failed to parse flow JSON, using fallback:", err.message);
     return {
       company,
       role,
@@ -70,8 +68,8 @@ Design between 3 and 6 rounds depending on role. For each round include 3-6 ques
           questions: [
             `What is an algorithm you frequently use for ${role}?`,
             `Explain time vs space complexity with an example.`,
-            `What data structures would you choose for caching?`
-          ]
+            `What data structures would you choose for caching?`,
+          ],
         },
         {
           round: 2,
@@ -82,8 +80,8 @@ Design between 3 and 6 rounds depending on role. For each round include 3-6 ques
           questions: [
             "Implement a function to reverse a linked list.",
             "Find the missing number in an array of size n-1 with numbers from 1..n.",
-            "Given a string, find the longest palindromic substring."
-          ]
+            "Given a string, find the longest palindromic substring.",
+          ],
         },
         {
           round: 3,
@@ -94,10 +92,10 @@ Design between 3 and 6 rounds depending on role. For each round include 3-6 ques
           questions: [
             "Tell me about a time you faced conflict in a team and how you resolved it.",
             "What are your long-term career goals?",
-            "Why do you want to join this company?"
-          ]
-        }
-      ]
+            "Why do you want to join this company?",
+          ],
+        },
+      ],
     };
   }
 }
@@ -105,18 +103,32 @@ Design between 3 and 6 rounds depending on role. For each round include 3-6 ques
 /**
  * Start a new job interview session and persist it
  */
-async function startJobInterview(userId, company = "Target Company", role = "Software Developer", experience = "Fresher", candidateProfileId = null) {
+async function startJobInterview(
+  userId,
+  company = "Target Company",
+  role = "Software Developer",
+  experience = "Fresher",
+  candidateProfileId = null
+) {
   const flow = await generateInterviewFlow(company, role, experience);
 
-  // convert durations/questions into the model shape for DB
-  const rounds = (flow.rounds || []).map((r, idx) => ({
-    round: r.round ?? (idx + 1),
-    name: r.name || `Round ${idx + 1}`,
-    type: r.type || "general",
-    description: r.description || "",
-    duration: r.duration ?? 30,
-    questions: (r.questions || []).map((q) => ({ question: q })),
-  }));
+  // 🔹 Convert to DB-friendly schema
+  const rounds = (flow.rounds || []).map((r, idx) => {
+    const isCodingRound = r.type?.toLowerCase().includes("coding");
+
+    return {
+      round: r.round ?? idx + 1,
+      name: r.name || `Round ${idx + 1}`,
+      type: r.type || "general",
+      description: r.description || "",
+      duration: r.duration ?? 30,
+      questions: (r.questions || []).map((q) => ({
+        question: q,
+        isCodingQuestion: isCodingRound, // ✅ Mark coding questions automatically
+        code: isCodingRound ? { language: "", content: "" } : undefined,
+      })),
+    };
+  });
 
   const totalDuration = rounds.reduce((sum, r) => sum + (r.duration || 0), 0);
 
@@ -134,6 +146,7 @@ async function startJobInterview(userId, company = "Target Company", role = "Sof
   return session;
 }
 
+
 /**
  * Submit a single answer for a given question in a round
  */
@@ -144,6 +157,8 @@ async function submitAnswer({
   roundIndex,
   questionIndex,
   userAnswer,
+  codeSnippet,
+  language,
 }) {
   const interview = await JobInterview.findById(interviewId);
   if (!interview) throw new Error("Interview not found");
@@ -154,64 +169,83 @@ async function submitAnswer({
   const question = round.questions[questionIndex];
   if (!question) throw new Error("Invalid question index");
 
-  // Step 1️⃣: Evaluate the answer using Gemini
-  const prompt = `Question: ${question.question}\nAnswer: ${userAnswer}\nEvaluate answer quality, give score (0–10) and one-line feedback in JSON:
-  { "score": <number>, "feedback": "<short>" }`;
-
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-
-  let evaluation;
-  try {
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}") + 1;
-    evaluation = JSON.parse(text.slice(start, end));
-  } catch {
-    evaluation = { score: 5, feedback: "Could not parse evaluation." };
+  // ✅ Step 1️⃣: Prepare base answer (text + optional code)
+  let fullAnswer = userAnswer || "";
+  if (codeSnippet) {
+    fullAnswer += `\n\n[User submitted code in ${
+      language || "unknown"
+    }]\n${codeSnippet}`;
   }
 
-  // Step 2️⃣: Save the user answer + evaluation
+  // ✅ Step 2️⃣: Evaluate using Gemini (skip if coding-type and no text)
+  let evaluation = { score: 5, feedback: "Answer recorded." };
+
+  if (userAnswer || !question.isCodingQuestion) {
+    const prompt = `Question: ${question.question}
+Answer: ${userAnswer || "(none)"}${codeSnippet ? `\nCode:\n${codeSnippet}` : ""}
+Evaluate this ${
+      question.isCodingQuestion ? "coding" : "theory"
+    } answer objectively. 
+Give JSON only: { "score": <0-10>, "feedback": "<one-line>" }`;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
+    try {
+      const start = text.indexOf("{");
+      const end = text.lastIndexOf("}") + 1;
+      evaluation = JSON.parse(text.slice(start, end));
+    } catch {
+      evaluation = { score: 5, feedback: "Could not parse evaluation." };
+    }
+  }
+
+  // ✅ Step 3️⃣: Save response
   question.userAnswer = userAnswer;
+  if (codeSnippet) {
+    question.code = { language, content: codeSnippet };
+  }
   question.score = evaluation.score;
   question.feedback = evaluation.feedback;
 
-  // Step 3️⃣: Conditionally generate cross-question
+  // ✅ Step 4️⃣: Conditional cross-question (same as before)
   const unsatisfactory =
     evaluation.score < 7 ||
     (evaluation.feedback &&
       evaluation.feedback.toLowerCase().includes("unsatisfactory"));
 
-  // Count existing cross questions across all rounds
-  const totalCrossQs = interview.rounds.reduce((sum, r) => {
-    return (
+  const totalCrossQs = interview.rounds.reduce(
+    (sum, r) =>
       sum +
-      r.questions.reduce((qsum, q) => qsum + (q.crossQuestions?.length || 0), 0)
-    );
-  }, 0);
+      r.questions.reduce(
+        (qsum, q) => qsum + (q.crossQuestions?.length || 0),
+        0
+      ),
+    0
+  );
 
   if (unsatisfactory && totalCrossQs < MAX_CROSS_QUESTIONS) {
     const crossPrompt = `The candidate gave an unsatisfactory answer to:
 Question: ${question.question}
 Answer: ${userAnswer}
-Generate ONE short cross-question to further probe understanding.`;
+${codeSnippet ? `Code:\n${codeSnippet}` : ""}
+Generate ONE short follow-up cross-question to test understanding.`;
 
     const crossRes = await model.generateContent(crossPrompt);
     const crossText = crossRes.response.text().trim();
 
-    const crossQuestion = {
+    question.crossQuestions.push({
       question: crossText,
       userAnswer: "",
       score: null,
       feedback: "",
-    };
-
-    question.crossQuestions.push(crossQuestion);
+    });
   }
 
-  // Step 4️⃣: Save updated interview document
+  // ✅ Step 5️⃣: Save interview
   await interview.save();
 
-  // Step 5️⃣: Check if interview is complete (all main + cross answered)
+  // ✅ Step 6️⃣: Mark complete if all answered
   const allAnswered = interview.rounds.every((r) =>
     r.questions.every(
       (q) => q.userAnswer || q.crossQuestions.every((cq) => cq.userAnswer)
@@ -330,21 +364,29 @@ async function evaluateJobInterview(sessionId) {
         question: q.question,
         answer: q.userAnswer || "Not answered",
         qIndex: qnaPairs.length + 1,
+        isCoding: q.isCodingQuestion || false, // <-- Added flag
       });
-      // Cross-questions
+
+      // Cross-questions (if any)
       q.crossQuestions?.forEach((cq) => {
         qnaPairs.push({
           question: cq.question,
           answer: cq.userAnswer || "Not answered",
           qIndex: qnaPairs.length + 1,
           parentQuestion: q.question,
+          isCoding: cq.isCodingQuestion || false, // optional future support
         });
       });
     });
   });
 
   const qnaText = qnaPairs
-    .map((q) => `Q${q.qIndex}: ${q.question}\nAnswer: ${q.answer}`)
+    .map(
+      (q) =>
+        `Q${q.qIndex}: ${q.question}\nAnswer: ${q.answer}\nType: ${
+          q.isCoding ? "Coding" : "Non-Coding"
+        }`
+    )
     .join("\n\n");
 
   const behavior = session.behavioralMetrics
@@ -354,15 +396,26 @@ async function evaluateJobInterview(sessionId) {
     - Avg emotions: ${JSON.stringify(session.behavioralMetrics.avgEmotions)}`
     : "";
 
+  // 🔹 Updated prompt to account for coding vs non-coding questions
   const prompt = `You are an interviewer evaluating answers for a ${session.role} role at ${session.company}.
-For each main question and its follow-ups (cross questions), say whether the answer is good/ok/poor, provide a short score (out of 10), and one-line feedback.
+
+For each question:
+- If "isCoding" is true, evaluate the code logic, efficiency, and correctness.
+- If "isCoding" is false, evaluate conceptual clarity, reasoning, and communication.
+
+For each main and follow-up (cross) question, provide:
+  - "qIndex" matching the question number,
+  - "score" out of 10,
+  - "verdict" (good / ok / poor),
+  - "feedback" (short comment).
+
 ${behavior}
 
 ${qnaText}
 
-Return your evaluation in JSON array format like:
+Return your evaluation strictly as a JSON array like:
 [
-  { "qIndex": 1, "score": 8, "verdict": "good", "feedback": "..." },
+  { "qIndex": 1, "score": 8, "verdict": "good", "feedback": "...", "isCoding": true/false },
   ...
 ]`;
 
@@ -416,9 +469,13 @@ Return your evaluation in JSON array format like:
   // Summarize overall performance including cross-questions
   const summaryPrompt = `Based on the evaluations, write a structured performance summary for the candidate interviewing for ${
     session.role
-  } at ${
-    session.company
-  }. Include strengths, weaknesses, and suggestions. Explicitly reference cross questions if they were asked.
+  } at ${session.company}. 
+Include:
+- Overall coding performance (if applicable)
+- Conceptual and communication strengths
+- Weaknesses
+- Suggestions for improvement
+- Mention if cross questions revealed deeper insights.
 
 Evaluations:
 ${JSON.stringify(evaluations, null, 2)}
@@ -435,6 +492,7 @@ ${JSON.stringify(evaluations, null, 2)}
   return session;
 }
 
+
 /**
  * Generate a high-level summary separately (if needed)
  */
@@ -450,6 +508,7 @@ async function generateSummary(sessionId) {
         question: q.question,
         answer: q.userAnswer || "Not answered",
         score: q.score ?? null,
+        isCoding: q.isCodingQuestion || false, // <-- Added
       });
       q.crossQuestions?.forEach((cq) => {
         qnaPairs.push({
@@ -457,6 +516,7 @@ async function generateSummary(sessionId) {
           answer: cq.userAnswer || "Not answered",
           score: cq.score ?? null,
           parentQuestion: q.question,
+          isCoding: cq.isCodingQuestion || false, // <-- Added
         });
       });
     });
@@ -469,11 +529,23 @@ async function generateSummary(sessionId) {
     - Avg emotions: ${JSON.stringify(session.behavioralMetrics.avgEmotions)}`
     : "";
 
-  const prompt = `Write a structured performance summary for a ${
+  // 🧩 Updated prompt for coding-awareness and cross-question emphasis
+  const prompt = `You are an AI interviewer summarizing the candidate's performance for the ${
     session.role
-  } interview at ${session.company}.
-Include strengths, weaknesses, areas for improvement, and non-verbal cues from video analysis. Explicitly mention follow-up/cross questions.
-Q&A:
+  } role at ${session.company}.
+
+For each question:
+- If "isCoding" is true, assess the coding logic, efficiency, correctness, and problem-solving approach.
+- If "isCoding" is false, focus on conceptual understanding, communication, and clarity.
+- Mention insights revealed by follow-up/cross questions when relevant.
+
+Then, write a final structured summary including:
+1. Strengths (coding + conceptual)
+2. Weaknesses / areas to improve
+3. Observed behavioral & non-verbal traits
+4. Overall impression / hiring suggestion
+
+Candidate's Question-Answer data:
 ${JSON.stringify(qnaPairs, null, 2)}
 ${behavior}`;
 
